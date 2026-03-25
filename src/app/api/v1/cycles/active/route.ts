@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/middleware';
-import { supabaseService } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
   const today = new Date();
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('cycles')
     .select('*')
     .eq('status', 'active')

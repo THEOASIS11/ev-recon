@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/middleware';
-import { supabaseService } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // GET /api/v1/submissions/me?cycle_id=...
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const cycle_id = searchParams.get('cycle_id');
 
-  let query = supabaseService
+  let query = supabaseAdmin
     .from('submissions')
     .select('*')
     .eq('user_id', auth.userId)

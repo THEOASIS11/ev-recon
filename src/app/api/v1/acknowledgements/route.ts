@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/middleware';
-import { supabaseService } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 // ack_type enum in DB: 'read' | 'dismissed'
 // We map:   reminder_20th → 'read'
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Check for duplicate
-  const { data: existing } = await supabaseService
+  const { data: existing } = await supabaseAdmin
     .from('acknowledgements')
     .select('id')
     .eq('user_id', auth.userId)
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Already acknowledged' }, { status: 409 });
   }
 
-  const { data, error } = await supabaseService
+  const { data, error } = await supabaseAdmin
     .from('acknowledgements')
     .insert({
       user_id: auth.userId,
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const cycle_id = searchParams.get('cycle_id');
 
-  let query = supabaseService.from('acknowledgements').select('*');
+  let query = supabaseAdmin.from('acknowledgements').select('*');
   if (cycle_id) query = query.eq('cycle_id', cycle_id);
 
   const { data, error } = await query;
