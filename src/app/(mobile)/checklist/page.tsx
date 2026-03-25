@@ -66,7 +66,7 @@ export default function ChecklistPage() {
       if (cycleRes.ok) {
         const json = await cycleRes.json();
         if (json.cycle) {
-          const label = new Date(json.cycle.start_date).toLocaleDateString('en-IN', {
+          const label = new Date(json.cycle.cycle_month).toLocaleDateString('en-IN', {
             month: 'long',
             year: 'numeric',
           });

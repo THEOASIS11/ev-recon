@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/useAuth';
 interface Cycle {
   id: string;
   month: string;
-  start_date: string;
+  cycle_month: string;
   status: string;
   days_until_cutoff: number;
 }
@@ -233,7 +233,7 @@ export default function HomePage() {
             </span>
           </div>
           <p style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 12px' }}>
-            {new Date(cycle.start_date).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+            {new Date(cycle.cycle_month).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={cycle.days_until_cutoff <= 3 ? '#f87171' : '#fbbf24'} strokeWidth={2}>

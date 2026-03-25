@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
     .from('cycles')
     .select('*')
     .eq('status', 'active')
-    .lte('start_date', today.toISOString().split('T')[0])
-    .order('start_date', { ascending: false })
+    .lte('cycle_month', today.toISOString().split('T')[0])
+    .order('cycle_month', { ascending: false })
     .maybeSingle();
 
   if (error) {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Calculate days until cutoff (28th of cycle month)
-  const cycleMonth = new Date(data.start_date);
+  const cycleMonth = new Date(data.cycle_month);
   const cutoffDate = new Date(cycleMonth.getFullYear(), cycleMonth.getMonth(), 28);
   const msPerDay = 1000 * 60 * 60 * 24;
   const days_until_cutoff = Math.ceil((cutoffDate.getTime() - today.getTime()) / msPerDay);
