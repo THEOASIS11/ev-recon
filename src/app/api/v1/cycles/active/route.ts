@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
     .from('cycles')
     .select('*')
     .eq('status', 'active')
-    .lte('cycle_month', today.toISOString().split('T')[0])
     .order('cycle_month', { ascending: false })
     .maybeSingle();
 
