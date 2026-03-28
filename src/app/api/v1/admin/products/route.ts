@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from('products')
-    .select('id, name, sku, is_active, display_order, created_at')
+    .select('id, name, is_active, display_order, created_at')
     .order('display_order', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         display_order: display_order ?? 999,
         is_active: true,
       })
-      .select('id, name, sku, is_active, display_order, created_at')
+      .select('id, name, is_active, display_order, created_at')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

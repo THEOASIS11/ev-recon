@@ -34,7 +34,7 @@ export async function PATCH(
     .from('products')
     .update(updates)
     .eq('id', productId)
-    .select('id, name, sku, is_active, display_order')
+    .select('id, name, is_active, display_order')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
