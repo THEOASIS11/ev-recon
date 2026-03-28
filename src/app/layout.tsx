@@ -8,7 +8,7 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_APP_NAME ?? 'Stock System',
+  title: process.env.NEXT_PUBLIC_APP_NAME ?? 'Humara UBoard',
   description: 'EV Inventory Reconciliation — U-Board',
   manifest: '/manifest.json',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',

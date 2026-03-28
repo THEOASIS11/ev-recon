@@ -25,8 +25,8 @@ export async function authenticateUser(
   | { token: string; user: { id: string; name: string; role: string } }
   | { error: string; status: number }
 > {
-  // Strip whitespace from inputs
-  const cleanPhone = phone.trim();
+  // Strip whitespace and normalize case
+  const cleanPhone = phone.trim().toLowerCase();
 
   // Check lockout
   const attempts = failedAttempts[cleanPhone];
@@ -47,7 +47,7 @@ export async function authenticateUser(
 
   if (error || !user) {
     incrementFailCount(cleanPhone);
-    return { error: 'Number ya password galat hai. Dobara try karo.', status: 401 };
+    return { error: 'Username ya password galat hai. Dobara try karo.', status: 401 };
   }
 
   if (!user.is_active) {
@@ -65,7 +65,7 @@ export async function authenticateUser(
         status: 423,
       };
     }
-    return { error: 'Number ya password galat hai. Dobara try karo.', status: 401 };
+    return { error: 'Username ya password galat hai. Dobara try karo.', status: 401 };
   }
 
   // Clear fail count on successful login

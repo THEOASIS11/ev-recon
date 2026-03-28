@@ -56,14 +56,39 @@ export default function LoginPage() {
     <main className="min-h-screen bg-white flex flex-col justify-center px-6 py-12">
       <div className="w-full max-w-sm mx-auto">
 
-        {/* Logo / App name */}
+        {/* Branding */}
         <div className="mb-10 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" />
-            </svg>
+          <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: '8px', justifyContent: 'center' }}>
+            <h1 style={{
+              fontSize: '26px',
+              fontWeight: 700,
+              color: '#ffffff',
+              letterSpacing: '2px',
+              textTransform: 'uppercase',
+              background: 'linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%)',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              margin: 0,
+            }}>
+              HUMARA UBOARD
+            </h1>
+            <span style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              color: '#3b82f6',
+            }}>
+              V1
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Stock System mein Login Karo</h1>
+          <p style={{
+            fontSize: '13px',
+            color: '#888',
+            fontStyle: 'italic',
+            marginTop: '8px',
+            marginBottom: 0,
+          }}>
+            Together we run further
+          </p>
         </div>
 
         {/* Error banner */}
@@ -73,18 +98,27 @@ export default function LoginPage() {
           </div>
         )}
 
+        {/* Sub-heading above form */}
+        <p style={{
+          fontSize: '14px',
+          color: '#888',
+          textAlign: 'center',
+          marginBottom: '20px',
+        }}>
+          Login karo apne account mein
+        </p>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Phone field */}
+          {/* Username field */}
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Mobile Number
+              Username
             </label>
             <input
               id="phone"
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
-              placeholder="+91 98XXXXXXXX"
+              type="text"
+              autoComplete="username"
+              placeholder="humarauboard..."
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               required
