@@ -25,7 +25,7 @@ export async function GET(
   // Fetch submissions
   const { data: submissions } = await supabaseAdmin
     .from('submissions')
-    .select('user_id, submission_type, payload, submitted_at, users(name)')
+    .select('user_id, submission_type, data, submitted_at, users(name)')
     .eq('cycle_id', cycleId);
 
   // Fetch products
@@ -35,9 +35,9 @@ export async function GET(
     .order('name');
 
   const closingPayload: Record<string, number> =
-    submissions?.find((s) => s.submission_type === 'closing_stock_furkan')?.payload || {};
+    (submissions?.find((s) => s.submission_type === 'closing_stock_furkan') as { data?: Record<string, number> } | undefined)?.data || {};
   const countPayload: Record<string, number> =
-    submissions?.find((s) => s.submission_type === 'physical_count_arjun')?.payload || {};
+    (submissions?.find((s) => s.submission_type === 'physical_count_arjun') as { data?: Record<string, number> } | undefined)?.data || {};
 
   const cycleLabel = new Date(cycle.cycle_month).toLocaleDateString('en-IN', {
     month: 'long',

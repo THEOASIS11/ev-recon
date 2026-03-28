@@ -14,7 +14,7 @@ export async function GET(
 
   const { data, error } = await supabaseAdmin
     .from('submissions')
-    .select('id, user_id, submission_type, submitted_at, payload, is_locked, users(name, role)')
+    .select('id, user_id, submission_type, submitted_at, data, is_locked, users(name, role)')
     .eq('cycle_id', cycleId)
     .order('submitted_at', { ascending: false });
 

@@ -26,7 +26,7 @@ export async function GET(
   // Fetch all submissions for this cycle
   const { data: submissions, error: subErr } = await supabaseAdmin
     .from('submissions')
-    .select('user_id, submission_type, payload, submitted_at, users(name)')
+    .select('user_id, submission_type, data, submitted_at, users(name)')
     .eq('cycle_id', cycleId);
 
   if (subErr) {
@@ -43,8 +43,8 @@ export async function GET(
   const closingStockSub = submissions?.find((s) => s.submission_type === 'closing_stock_furkan');
   const physicalCountSub = submissions?.find((s) => s.submission_type === 'physical_count_arjun');
 
-  const closingPayload: Record<string, number> = closingStockSub?.payload || {};
-  const countPayload: Record<string, number> = physicalCountSub?.payload || {};
+  const closingPayload: Record<string, number> = (closingStockSub as { data?: Record<string, number> } | undefined)?.data || {};
+  const countPayload: Record<string, number> = (physicalCountSub as { data?: Record<string, number> } | undefined)?.data || {};
 
   const productRows = (products || []).map((p) => {
     const closing = closingPayload[p.id] ?? null;
