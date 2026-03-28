@@ -48,7 +48,8 @@ export async function GET(
   const wb = XLSX.utils.book_new();
 
   // Sheet 1: Leakage Report
-  const reportData = (products || []).map((p) => {
+  type ReportRow = Record<string, string | number | null>;
+  const reportData: ReportRow[] = (products || []).map((p) => {
     const closing: number | null = closingPayload[p.id] ?? null;
     const count: number | null = countPayload[p.id] ?? null;
     const diff: number | string = closing !== null && count !== null ? count - closing : '';
@@ -62,7 +63,7 @@ export async function GET(
   });
 
   const returnsInTransit = cycle.returns_in_transit || { amazon: 0, flipkart: 0 };
-  reportData.push({} as Record<string, unknown>);
+  reportData.push({});
   reportData.push({
     'Product': 'Returns in Transit — Amazon',
     'SKU': '',
