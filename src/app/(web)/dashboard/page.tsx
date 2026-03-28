@@ -11,6 +11,12 @@ interface Cycle {
   returns_in_transit: { amazon: number; flipkart: number } | null;
 }
 
+interface AuthUser {
+  userId: string;
+  name: string;
+  role: string;
+}
+
 interface Submission {
   id: string;
   user_id: string;
@@ -45,6 +51,12 @@ export default function DashboardPage() {
   const [amazon, setAmazon] = useState('');
   const [flipkart, setFlipkart] = useState('');
   const [ritSaved, setRitSaved] = useState(false);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  // Create cycle state (admin only)
+  const [newCycleMonth, setNewCycleMonth] = useState('');
+  const [creatingCycle, setCreatingCycle] = useState(false);
+  const [createCycleError, setCreateCycleError] = useState('');
+  const [createCycleSuccess, setCreateCycleSuccess] = useState('');
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -76,6 +88,15 @@ export default function DashboardPage() {
   }, [token]);
 
   useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try { setCurrentUser(JSON.parse(stored) as AuthUser); } catch { /* ignore */ }
+    }
+    // Default new cycle month to current month
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    setNewCycleMonth(`${yyyy}-${mm}`);
     fetchData();
   }, [fetchData]);
 
@@ -92,6 +113,32 @@ export default function DashboardPage() {
       setTimeout(() => setRitSaved(false), 2000);
     } catch { /* silent */ } finally {
       setSavingRIT(false);
+    }
+  }
+
+  async function createCycle() {
+    if (!token || !newCycleMonth) return;
+    setCreatingCycle(true);
+    setCreateCycleError('');
+    setCreateCycleSuccess('');
+    try {
+      // Convert YYYY-MM to YYYY-MM-01 for the API
+      const cycleMonthDate = newCycleMonth + '-01';
+      const res = await fetch('/api/v1/cycles', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cycle_month: cycleMonthDate }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateCycleError(data.error || 'Failed to create cycle.');
+        return;
+      }
+      const label = new Date(cycleMonthDate).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      setCreateCycleSuccess(`Cycle for ${label} created successfully!`);
+      fetchData();
+    } catch { setCreateCycleError('Server error.'); } finally {
+      setCreatingCycle(false);
     }
   }
 
@@ -125,9 +172,39 @@ export default function DashboardPage() {
       </div>
 
       {!cycle ? (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '40px', textAlign: 'center' }}>
-          <p style={{ color: '#9ca3af', fontSize: '15px', margin: '0 0 16px' }}>No active cycle found.</p>
-          <p style={{ color: '#d1d5db', fontSize: '13px', margin: 0 }}>Create a new cycle from Admin to get started.</p>
+        <div>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '40px', textAlign: 'center', marginBottom: '20px' }}>
+            <p style={{ color: '#9ca3af', fontSize: '15px', margin: '0 0 8px' }}>No active cycle found.</p>
+            <p style={{ color: '#d1d5db', fontSize: '13px', margin: 0 }}>
+              {currentUser?.role === 'admin' ? 'Create a new cycle below to get started.' : 'Ask Admin to create a new cycle.'}
+            </p>
+          </div>
+          {currentUser?.role === 'admin' && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '24px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Create New Cycle</h2>
+              <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 18px' }}>Start a new reconciliation cycle for a month.</p>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Cycle Month</label>
+                  <input
+                    type="month"
+                    value={newCycleMonth}
+                    onChange={(e) => setNewCycleMonth(e.target.value)}
+                    style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+                <button
+                  onClick={createCycle}
+                  disabled={creatingCycle || !newCycleMonth}
+                  style={{ padding: '8px 20px', backgroundColor: '#111827', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: creatingCycle ? 0.7 : 1 }}
+                >
+                  {creatingCycle ? 'Creating...' : 'Create Cycle'}
+                </button>
+              </div>
+              {createCycleError && <p style={{ fontSize: '13px', color: '#dc2626', margin: '10px 0 0' }}>{createCycleError}</p>}
+              {createCycleSuccess && <p style={{ fontSize: '13px', color: '#16a34a', margin: '10px 0 0' }}>✓ {createCycleSuccess}</p>}
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -272,7 +349,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick actions */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '28px' }}>
             <button
               onClick={() => router.push('/report')}
               style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', textAlign: 'left', cursor: 'pointer' }}
@@ -281,15 +358,54 @@ export default function DashboardPage() {
               <p style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Leakage Report</p>
               <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>Compare closing stock vs physical count</p>
             </button>
-            <button
-              onClick={() => router.push('/clearance')}
-              style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', textAlign: 'left', cursor: 'pointer' }}
-            >
-              <p style={{ fontSize: '24px', margin: '0 0 8px' }}>✅</p>
-              <p style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Clearance</p>
-              <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>Mark staff as cleared or on hold</p>
-            </button>
+            {currentUser?.role === 'reconciler' || currentUser?.role === 'admin' ? (
+              <button
+                onClick={() => router.push('/clearance')}
+                style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <p style={{ fontSize: '24px', margin: '0 0 8px' }}>✅</p>
+                <p style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Clearance</p>
+                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>Mark staff as cleared or on hold</p>
+              </button>
+            ) : currentUser?.role === 'supervisor' ? (
+              <button
+                onClick={() => router.push('/signoff')}
+                style={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', textAlign: 'left', cursor: 'pointer' }}
+              >
+                <p style={{ fontSize: '24px', margin: '0 0 8px' }}>✍️</p>
+                <p style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Sign-off</p>
+                <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>Review and lock the cycle</p>
+              </button>
+            ) : null}
           </div>
+
+          {/* Create Cycle — admin only, shown only when no active cycle */}
+          {!cycle && currentUser?.role === 'admin' && (
+            <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '20px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Create New Cycle</h2>
+              <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 16px' }}>Start a new reconciliation cycle for a month.</p>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Cycle Month</label>
+                  <input
+                    type="month"
+                    value={newCycleMonth}
+                    onChange={(e) => setNewCycleMonth(e.target.value)}
+                    style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+                <button
+                  onClick={createCycle}
+                  disabled={creatingCycle || !newCycleMonth}
+                  style={{ padding: '8px 20px', backgroundColor: '#111827', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', opacity: creatingCycle ? 0.7 : 1 }}
+                >
+                  {creatingCycle ? 'Creating...' : 'Create Cycle'}
+                </button>
+              </div>
+              {createCycleError && <p style={{ fontSize: '13px', color: '#dc2626', margin: '10px 0 0' }}>{createCycleError}</p>}
+              {createCycleSuccess && <p style={{ fontSize: '13px', color: '#16a34a', margin: '10px 0 0' }}>✓ {createCycleSuccess}</p>}
+            </div>
+          )}
         </>
       )}
     </div>

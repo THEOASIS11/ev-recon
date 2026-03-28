@@ -11,10 +11,13 @@ interface AuthUser {
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/dashboard', icon: '📊', roles: ['reconciler', 'supervisor', 'admin'] },
-  { label: 'Report', path: '/report', icon: '📋', roles: ['reconciler', 'supervisor', 'admin'] },
+  { label: 'Leakage Report', path: '/report', icon: '📋', roles: ['reconciler', 'supervisor', 'admin'] },
+  { label: 'Sign-off', path: '/signoff', icon: '✍️', roles: ['supervisor'] },
   { label: 'Clearance', path: '/clearance', icon: '✅', roles: ['reconciler', 'admin'] },
+  { label: 'Salary Report', path: '/admin/salary', icon: '💰', roles: ['admin'] },
+  { label: 'Users', path: '/admin/users', icon: '👥', roles: ['admin'] },
+  { label: 'Products', path: '/admin/products', icon: '📦', roles: ['admin'] },
   { label: 'History', path: '/history', icon: '🕐', roles: ['reconciler', 'supervisor', 'admin'] },
-  { label: 'Admin', path: '/admin/users', icon: '⚙️', roles: ['admin'] },
 ];
 
 export default function WebLayout({ children }: { children: React.ReactNode }) {
@@ -90,7 +93,7 @@ export default function WebLayout({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 8px' }}>
           {visibleNav.map((item) => {
-            const active = pathname === item.path || pathname.startsWith(item.path + '/');
+            const active = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path));
             return (
               <button
                 key={item.path}
