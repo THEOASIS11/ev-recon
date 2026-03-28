@@ -49,10 +49,9 @@ export async function GET(
 
   // Sheet 1: Leakage Report
   const reportData = (products || []).map((p) => {
-    const closing = closingPayload[p.id] ?? '';
-    const count = countPayload[p.id] ?? '';
-    const diff =
-      closing !== '' && count !== '' ? (count as number) - (closing as number) : '';
+    const closing: number | null = closingPayload[p.id] ?? null;
+    const count: number | null = countPayload[p.id] ?? null;
+    const diff: number | string = closing !== null && count !== null ? count - closing : '';
     return {
       'Product': p.name,
       'SKU': p.sku || '',
