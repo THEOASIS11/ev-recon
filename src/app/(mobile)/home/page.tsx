@@ -99,7 +99,7 @@ function getTasksForUser(
       },
       {
         label: 'Closing Stock Submit Karo',
-        sublabel: '3 products ka closing number',
+        sublabel: '10 products ka closing number',
         type: 'closing_stock_furkan',
         route: '/submit/closing-stock',
         done: doneTypes.has('closing_stock_furkan'),
@@ -173,6 +173,8 @@ export default function HomePage() {
 
   const tasks = cycle ? getTasksForUser(user.name, user.role, submissions) : [];
   const allDone = tasks.length > 0 && tasks.every((t) => t.done);
+  const completedCount = tasks.filter((t) => t.done).length;
+
   const greeting = (() => {
     const h = new Date().getHours();
     if (h < 12) return 'Subah ki shubhkamnaen';
@@ -180,198 +182,261 @@ export default function HomePage() {
     return 'Shaam ko namaste';
   })();
 
+  const cycleLabel = cycle
+    ? new Date(cycle.cycle_month).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+    : '';
+
   return (
-    <div style={{ padding: '24px 16px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
-        <div>
-          <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '2px' }}>{greeting} 👋</p>
-          <h1 style={{ color: '#ffffff', fontSize: '22px', fontWeight: '700', margin: 0 }}>{user.name}</h1>
-        </div>
-        <button
-          onClick={logout}
-          style={{
-            background: 'none',
-            border: '1px solid #2a2a2a',
-            borderRadius: '8px',
-            color: '#6b7280',
-            fontSize: '12px',
-            padding: '6px 12px',
-            cursor: 'pointer',
-          }}
-        >
-          Logout
-        </button>
-      </div>
+    <>
+      <style>{`
+        .task-card {
+          background: #111113;
+          border: 1px solid #27272a;
+          border-radius: 16px;
+          padding: 16px;
+          text-align: left;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          width: 100%;
+          min-height: 76px;
+          transition: border-color 0.15s ease, background 0.15s ease;
+          font-family: inherit;
+        }
+        .task-card:hover:not(:disabled) {
+          border-color: #3b82f6;
+          background: #18181b;
+        }
+        .task-card:disabled {
+          cursor: default;
+          background: #0c1a10;
+          border-color: rgba(34,197,94,0.25);
+        }
+        .logout-btn {
+          background: none;
+          border: 1px solid #27272a;
+          border-radius: 8px;
+          color: #71717a;
+          font-size: 12px;
+          padding: 6px 12px;
+          cursor: pointer;
+          font-family: inherit;
+          transition: border-color 0.15s ease, color 0.15s ease;
+        }
+        .logout-btn:hover { border-color: #3f3f46; color: #a1a1aa; }
+      `}</style>
 
-      {/* Cycle card */}
-      {loading ? (
-        <div style={{ backgroundColor: '#1a1a1a', borderRadius: '16px', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>Loading...</p>
-        </div>
-      ) : cycle ? (
-        <div style={{
-          backgroundColor: '#1a2340',
-          border: '1px solid #1e3a5f',
-          borderRadius: '16px',
-          padding: '20px',
-          marginBottom: '20px',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ color: '#93c5fd', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Active Cycle
-            </span>
-            <span style={{
-              backgroundColor: '#1e3a5f',
-              color: '#60a5fa',
-              fontSize: '11px',
-              padding: '2px 8px',
-              borderRadius: '99px',
-              fontWeight: '600',
-            }}>
-              {cycle.status.toUpperCase()}
-            </span>
-          </div>
-          <p style={{ color: '#ffffff', fontSize: '20px', fontWeight: '700', margin: '0 0 12px' }}>
-            {new Date(cycle.cycle_month).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={cycle.days_until_cutoff <= 3 ? '#f87171' : '#fbbf24'} strokeWidth={2}>
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span style={{ color: cycle.days_until_cutoff <= 3 ? '#f87171' : '#fbbf24', fontSize: '13px' }}>
-              {cycle.days_until_cutoff > 0
-                ? `Cutoff mein ${cycle.days_until_cutoff} din baaki`
-                : cycle.days_until_cutoff === 0
-                ? 'Aaj cutoff hai!'
-                : 'Cutoff ho gayi'}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div style={{ backgroundColor: '#1a1a1a', borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
-          <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>Abhi koi active cycle nahi hai.</p>
-        </div>
-      )}
+      <div style={{ padding: '28px 16px 20px' }}>
 
-      {/* Clearance indicator */}
-      {cycle && (
-        <div style={{
-          backgroundColor: allDone ? '#052e16' : '#1a1a1a',
-          border: `1px solid ${allDone ? '#166534' : '#2a2a2a'}`,
-          borderRadius: '12px',
-          padding: '14px 16px',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-        }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+          <div>
+            <p style={{ color: '#71717a', fontSize: '13px', marginBottom: '4px', fontWeight: 300, letterSpacing: '0.5px' }}>
+              {greeting}
+            </p>
+            <h1 style={{ color: '#fafafa', fontSize: '24px', fontWeight: 300, margin: 0, letterSpacing: '0.5px' }}>
+              Namaskar, <span style={{ fontWeight: 700 }}>{user.name.split(' ')[0]}</span>
+            </h1>
+          </div>
+          <button className="logout-btn" onClick={logout}>Logout</button>
+        </div>
+
+        {/* Cycle card */}
+        {loading ? (
           <div style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: allDone ? '#16a34a' : '#374151',
+            background: '#111113',
+            border: '1px solid #27272a',
+            borderRadius: '20px',
+            padding: '24px 20px',
+            marginBottom: '16px',
+            textAlign: 'center',
+          }}>
+            <p style={{ color: '#71717a', fontSize: '14px', margin: 0 }}>Load ho raha hai...</p>
+          </div>
+        ) : cycle ? (
+          <div style={{
+            background: 'linear-gradient(135deg, #0f1f3d 0%, #111827 60%, #0d1117 100%)',
+            border: '1px solid rgba(59,130,246,0.2)',
+            borderRadius: '20px',
+            padding: '20px',
+            marginBottom: '16px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Glow blob */}
+            <div style={{
+              position: 'absolute',
+              top: '-20px',
+              right: '-20px',
+              width: '100px',
+              height: '100px',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={{ color: '#60a5fa', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px', margin: '0 0 6px' }}>
+                  Active Cycle
+                </p>
+                <p style={{ color: '#fafafa', fontSize: '20px', fontWeight: 700, margin: '0 0 16px' }}>
+                  {cycleLabel}
+                </p>
+              </div>
+              <span style={{
+                background: 'rgba(59,130,246,0.15)',
+                color: '#60a5fa',
+                fontSize: '10px',
+                padding: '3px 10px',
+                borderRadius: '99px',
+                fontWeight: 700,
+                letterSpacing: '0.5px',
+                border: '1px solid rgba(59,130,246,0.25)',
+                textTransform: 'uppercase',
+              }}>
+                {cycle.status}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{
+                fontSize: '32px',
+                fontWeight: 700,
+                color: cycle.days_until_cutoff <= 3 ? '#ef4444' : '#3b82f6',
+                lineHeight: 1,
+              }}>
+                {Math.abs(cycle.days_until_cutoff)}
+              </span>
+              <span style={{ color: cycle.days_until_cutoff <= 3 ? '#fca5a5' : '#93c5fd', fontSize: '14px', fontWeight: 400 }}>
+                {cycle.days_until_cutoff > 0
+                  ? 'din baaki cutoff mein'
+                  : cycle.days_until_cutoff === 0
+                  ? 'Aaj cutoff hai!'
+                  : 'din baad cutoff ho gayi'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: '#111113', border: '1px solid #27272a', borderRadius: '20px', padding: '24px 20px', marginBottom: '16px' }}>
+            <p style={{ color: '#71717a', fontSize: '14px', margin: 0 }}>Abhi koi active cycle nahi hai.</p>
+          </div>
+        )}
+
+        {/* Progress bar */}
+        {cycle && tasks.length > 0 && (
+          <div style={{
+            background: '#111113',
+            border: `1px solid ${allDone ? 'rgba(34,197,94,0.25)' : '#27272a'}`,
+            borderRadius: '14px',
+            padding: '14px 16px',
+            marginBottom: '24px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
+            gap: '12px',
           }}>
-            {allDone ? (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#ffffff" strokeWidth={3}>
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            )}
+            <div style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '50%',
+              background: allDone ? 'rgba(34,197,94,0.15)' : '#18181b',
+              border: `2px solid ${allDone ? '#22c55e' : '#3f3f46'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              transition: 'all 0.3s ease',
+            }}>
+              {allDone ? (
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#22c55e" strokeWidth={2.5}>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <span style={{ color: '#3b82f6', fontSize: '13px', fontWeight: 700 }}>
+                  {completedCount}/{tasks.length}
+                </span>
+              )}
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ color: allDone ? '#22c55e' : '#fafafa', fontSize: '14px', fontWeight: 600, margin: '0 0 2px' }}>
+                {allDone ? 'Saari tasks complete!' : 'Tasks pending hain'}
+              </p>
+              <p style={{ color: '#71717a', fontSize: '12px', margin: 0 }}>
+                {allDone
+                  ? 'Clearance ke liye ready ho'
+                  : `${tasks.filter((t) => !t.done).length} task${tasks.filter((t) => !t.done).length > 1 ? 's' : ''} baaki`}
+              </p>
+            </div>
           </div>
-          <div>
-            <p style={{ color: allDone ? '#4ade80' : '#9ca3af', fontSize: '14px', fontWeight: '600', margin: 0 }}>
-              {allDone ? 'Saari tasks complete!' : 'Tasks pending hain'}
-            </p>
-            <p style={{ color: '#6b7280', fontSize: '12px', margin: '2px 0 0' }}>
-              {allDone ? 'Clearance dene ke liye ready' : `${tasks.filter((t) => !t.done).length} baaki hai`}
-            </p>
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Task list */}
-      {cycle && tasks.length > 0 && (
-        <div>
-          <p style={{ color: '#9ca3af', fontSize: '13px', fontWeight: '600', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Aaj ki Tasks
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {tasks.map((task) => (
-              <button
-                key={task.type}
-                onClick={() => !task.done && router.push(task.route)}
-                disabled={task.done}
-                style={{
-                  backgroundColor: task.done ? '#0f2818' : '#1a1a1a',
-                  border: `1px solid ${task.done ? '#166534' : '#2a2a2a'}`,
-                  borderRadius: '14px',
-                  padding: '16px',
-                  textAlign: 'left',
-                  cursor: task.done ? 'default' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '14px',
-                  width: '100%',
-                  minHeight: '72px',
-                }}
-              >
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  backgroundColor: task.done ? '#16a34a' : '#374151',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  {task.done ? (
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#ffffff" strokeWidth={3}>
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  ) : (
-                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" strokeWidth={2}>
-                      <circle cx="12" cy="12" r="10" />
+        {/* Task list */}
+        {cycle && tasks.length > 0 && (
+          <div>
+            <p style={{ color: '#71717a', fontSize: '11px', fontWeight: 600, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Aaj ki Tasks
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {tasks.map((task) => (
+                <button
+                  key={task.type}
+                  onClick={() => !task.done && router.push(task.route)}
+                  disabled={task.done}
+                  className="task-card"
+                >
+                  {/* Status circle */}
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    background: task.done ? 'rgba(34,197,94,0.12)' : '#18181b',
+                    border: `2px solid ${task.done ? '#22c55e' : '#3f3f46'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'all 0.2s ease',
+                  }}>
+                    {task.done ? (
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#22c55e" strokeWidth={2.5}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6' }} />
+                    )}
+                  </div>
+
+                  {/* Text */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: task.done ? '#22c55e' : '#fafafa', fontSize: '15px', fontWeight: 600, margin: '0 0 3px', lineHeight: 1.2 }}>
+                      {task.label}
+                    </p>
+                    <p style={{ color: '#71717a', fontSize: '12px', margin: 0 }}>
+                      {task.done && task.submittedAt
+                        ? `✓ ${formatDate(task.submittedAt)}`
+                        : task.sublabel}
+                    </p>
+                  </div>
+
+                  {/* Chevron */}
+                  {!task.done && (
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#3f3f46" strokeWidth={2}>
+                      <polyline points="9 18 15 12 9 6" />
                     </svg>
                   )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ color: task.done ? '#4ade80' : '#ffffff', fontSize: '15px', fontWeight: '600', margin: 0 }}>
-                    {task.label}
-                  </p>
-                  <p style={{ color: '#6b7280', fontSize: '12px', margin: '2px 0 0' }}>
-                    {task.done && task.submittedAt
-                      ? `✓ ${formatDate(task.submittedAt)}`
-                      : task.sublabel}
-                  </p>
-                </div>
-                {!task.done && (
-                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#6b7280" strokeWidth={2}>
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                )}
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!cycle && !loading && (
-        <div style={{ textAlign: 'center', marginTop: '40px' }}>
-          <p style={{ color: '#4b5563', fontSize: '15px' }}>Koi task nahi hai abhi.</p>
-        </div>
-      )}
-    </div>
+        {!cycle && !loading && (
+          <div style={{ textAlign: 'center', marginTop: '60px' }}>
+            <p style={{ color: '#3f3f46', fontSize: '15px' }}>Koi task nahi hai abhi.</p>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

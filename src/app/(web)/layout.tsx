@@ -78,14 +78,24 @@ export default function WebLayout({ children }: { children: React.ReactNode }) {
         zIndex: 10,
       }}>
         {/* Logo */}
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f0f0f0' }}>
+        <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid #f0f0f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '28px', height: '28px', backgroundColor: '#111827', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#ffffff', fontSize: '14px', fontWeight: '700' }}>EV</span>
-            </div>
             <div>
-              <p style={{ fontSize: '13px', fontWeight: '700', color: '#111827', margin: 0 }}>EV Recon</p>
-              <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>Reconciliation</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <p style={{ fontSize: '12px', fontWeight: '800', color: '#111827', margin: 0, letterSpacing: '1.5px', textTransform: 'uppercase' }}>HUMARA UBOARD</p>
+                <span style={{
+                  fontSize: '9px',
+                  fontWeight: '700',
+                  color: '#3b82f6',
+                  border: '1px solid rgba(59,130,246,0.35)',
+                  borderRadius: '99px',
+                  padding: '1px 6px',
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  flexShrink: 0,
+                }}>V1</span>
+              </div>
+              <p style={{ fontSize: '10px', color: '#9ca3af', margin: 0 }}>EV Reconciliation</p>
             </div>
           </div>
         </div>
@@ -104,15 +114,16 @@ export default function WebLayout({ children }: { children: React.ReactNode }) {
                   gap: '10px',
                   width: '100%',
                   padding: '9px 12px',
-                  borderRadius: '8px',
+                  borderRadius: '10px',
                   border: 'none',
                   cursor: 'pointer',
-                  marginBottom: '2px',
-                  backgroundColor: active ? '#f3f4f6' : 'transparent',
-                  color: active ? '#111827' : '#6b7280',
-                  fontSize: '14px',
+                  marginBottom: '3px',
+                  backgroundColor: active ? '#eff6ff' : 'transparent',
+                  color: active ? '#1d4ed8' : '#6b7280',
+                  fontSize: '13.5px',
                   fontWeight: active ? '600' : '400',
                   textAlign: 'left',
+                  transition: 'background-color 0.12s ease, color 0.12s ease',
                 }}
               >
                 <span style={{ fontSize: '16px' }}>{item.icon}</span>

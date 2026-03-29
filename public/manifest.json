@@ -1,11 +1,11 @@
 {
-  "name": "Stock System",
-  "short_name": "Stock",
-  "description": "EV Inventory Reconciliation — U-Board",
+  "name": "Humara UBoard",
+  "short_name": "UBoard",
+  "description": "EV Inventory Reconciliation — Together we run further",
   "start_url": "/login",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "background_color": "#09090b",
+  "theme_color": "#3b82f6",
   "orientation": "portrait",
   "icons": [
     {

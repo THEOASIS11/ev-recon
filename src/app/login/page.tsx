@@ -30,20 +30,16 @@ export default function LoginPage() {
         return;
       }
 
-      // Store token and user in localStorage
       localStorage.setItem('token', json.token);
       localStorage.setItem('user', JSON.stringify(json.user));
 
-      // Route based on role
       const role: string = json.user.role;
       if (role === 'factory_staff') {
         router.push('/home');
       } else if (role === 'supervisor') {
-        // Check device — if mobile go to /home, desktop go to /dashboard
         const isMobile = window.innerWidth < 768;
         router.push(isMobile ? '/home' : '/dashboard');
       } else {
-        // reconciler, admin
         router.push('/dashboard');
       }
     } catch {
@@ -53,121 +49,199 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white flex flex-col justify-center px-6 py-12">
-      <div className="w-full max-w-sm mx-auto">
+    <>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #09090b; }
+        .login-input {
+          width: 100%;
+          background: #111113;
+          border: 1px solid #27272a;
+          border-radius: 12px;
+          padding: 14px 16px;
+          font-size: 16px;
+          color: #fafafa;
+          outline: none;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          font-family: inherit;
+        }
+        .login-input::placeholder { color: #71717a; }
+        .login-input:focus {
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+        }
+        .login-btn {
+          width: 100%;
+          padding: 16px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, #3b82f6, #2563eb);
+          color: white;
+          font-weight: 600;
+          font-size: 16px;
+          letter-spacing: 0.5px;
+          border: none;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: inherit;
+        }
+        .login-btn:hover:not(:disabled) {
+          background: linear-gradient(135deg, #60a5fa, #3b82f6);
+          transform: scale(0.99);
+        }
+        .login-btn:active:not(:disabled) { transform: scale(0.97); }
+        .login-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .label-text {
+          display: block;
+          font-size: 12px;
+          color: #71717a;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 8px;
+          font-weight: 500;
+        }
+      `}</style>
 
-        {/* Branding */}
-        <div className="mb-10 text-center">
-          <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: '8px', justifyContent: 'center' }}>
-            <h1 style={{
-              fontSize: '26px',
-              fontWeight: 700,
-              color: '#ffffff',
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              background: 'linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%)',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              margin: 0,
-            }}>
-              HUMARA UBOARD
-            </h1>
-            <span style={{
+      <main style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(180deg, #09090b 0%, #0c1222 60%, #09090b 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 20px',
+      }}>
+        <div style={{ width: '100%', maxWidth: '400px' }}>
+
+          {/* Branding */}
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
+              <h1 style={{
+                fontSize: '28px',
+                fontWeight: 800,
+                color: '#fafafa',
+                letterSpacing: '4px',
+                textTransform: 'uppercase',
+                margin: 0,
+              }}>
+                HUMARA UBOARD
+              </h1>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#3b82f6',
+                border: '1px solid rgba(59,130,246,0.25)',
+                borderRadius: '20px',
+                padding: '2px 10px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                flexShrink: 0,
+              }}>
+                V1
+              </span>
+            </div>
+            <p style={{
               fontSize: '14px',
-              fontWeight: 700,
-              color: '#3b82f6',
+              color: '#71717a',
+              fontWeight: 300,
+              letterSpacing: '1px',
+              marginBottom: '24px',
             }}>
-              V1
-            </span>
+              Together we run further
+            </p>
+            {/* Divider */}
+            <div style={{ width: '40px', height: '1px', backgroundColor: '#27272a', margin: '0 auto' }} />
           </div>
+
+          {/* Error banner */}
+          {error && (
+            <div style={{
+              background: '#1c1917',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+            }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: '#ef4444',
+                flexShrink: 0,
+              }} />
+              <p style={{ color: '#fca5a5', fontSize: '13px', lineHeight: 1.5 }}>{error}</p>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit}>
+            <p style={{ fontSize: '16px', color: '#a1a1aa', marginBottom: '20px', textAlign: 'center' }}>
+              Login karo
+            </p>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label htmlFor="username" className="label-text">Username</label>
+              <input
+                id="username"
+                type="text"
+                autoComplete="username"
+                placeholder="humarauboard..."
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="login-input"
+              />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label htmlFor="password" className="label-text">Password</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="login-input"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !phone || !password}
+              className="login-btn"
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                  <svg style={{ animation: 'spin 1s linear infinite' }} width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  Connecting...
+                </span>
+              ) : (
+                'Login Karo →'
+              )}
+            </button>
+          </form>
+
           <p style={{
-            fontSize: '13px',
-            color: '#888',
-            fontStyle: 'italic',
-            marginTop: '8px',
-            marginBottom: 0,
+            textAlign: 'center',
+            fontSize: '12px',
+            color: '#71717a',
+            marginTop: '20px',
           }}>
-            Together we run further
+            Password bhool gaye? Admin se poocho.
           </p>
         </div>
 
-        {/* Error banner */}
-        {error && (
-          <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200">
-            <p className="text-sm text-red-700 font-medium">{error}</p>
-          </div>
-        )}
-
-        {/* Sub-heading above form */}
-        <p style={{
-          fontSize: '14px',
-          color: '#888',
-          textAlign: 'center',
-          marginBottom: '20px',
-        }}>
-          Login karo apne account mein
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Username field */}
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Username
-            </label>
-            <input
-              id="phone"
-              type="text"
-              autoComplete="username"
-              placeholder="humarauboard..."
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              className="w-full h-14 px-4 rounded-xl border border-gray-300 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Password field */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full h-14 px-4 rounded-xl border border-gray-300 text-base text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Submit button */}
-          <button
-            type="submit"
-            disabled={loading || !phone || !password}
-            className="w-full h-14 rounded-xl bg-blue-600 text-white text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                <span>Login ho raha hai...</span>
-              </>
-            ) : (
-              'Login Karo'
-            )}
-          </button>
-        </form>
-
-        {/* Forgot password note */}
-        <p className="mt-6 text-center text-sm text-gray-400">
-          Password bhool gaye? Admin se poocho.
-        </p>
-      </div>
-    </main>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+      </main>
+    </>
   );
 }
