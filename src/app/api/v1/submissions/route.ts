@@ -53,6 +53,10 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/v1/submissions
+// If submission already exists for this user+cycle+type:
+//   - if cycle is signed_off → 403
+//   - otherwise → UPDATE and return 200
+// If no submission exists → INSERT and return 201
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check cycle is active
+    // Check cycle exists and get its status
     const { data: cycle, error: cycleError } = await supabaseAdmin
       .from('cycles')
       .select('status')
@@ -79,9 +83,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cycle not found.' }, { status: 404 });
     }
 
+    // Signed-off cycles are fully locked
+    if (cycle.status === 'signed_off') {
+      return NextResponse.json(
+        { error: 'Cycle sign-off ho chuka hai. Ab koi changes nahi ho sakte.' },
+        { status: 403 }
+      );
+    }
+
     if (cycle.status !== 'active') {
       return NextResponse.json(
-        { error: 'Is cycle mein submit nahi kar sakte. Cycle closed hai.' },
+        { error: 'Is cycle mein submit nahi kar sakte. Cycle active nahi hai.' },
         { status: 403 }
       );
     }
@@ -95,25 +107,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for duplicate (one per type per cycle)
+    // Check for existing submission (one per type per cycle per user)
     const { data: existing } = await supabaseAdmin
       .from('submissions')
-      .select('id')
+      .select('id, is_locked')
       .eq('cycle_id', cycle_id)
       .eq('user_id', auth.userId)
       .eq('submission_type', submission_type)
-      .single();
+      .maybeSingle();
 
     if (existing) {
-      return NextResponse.json(
-        { error: 'Aap pehle se submit kar chuke hain is cycle mein.' },
-        { status: 409 }
-      );
+      // UPDATE existing submission with new data + fresh timestamp
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('submissions')
+        .update({
+          data,
+          submitted_at: new Date().toISOString(),
+          is_locked: false,
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return NextResponse.json({ submission: updated, updated: true }, { status: 200 });
     }
 
-    // Physical count locks immediately
-    const isLocked = submission_type === 'physical_count_arjun';
-
+    // Insert new submission
     const { data: submission, error: insertError } = await supabaseAdmin
       .from('submissions')
       .insert({
@@ -121,7 +141,7 @@ export async function POST(request: NextRequest) {
         user_id: auth.userId,
         submission_type,
         data,
-        is_locked: isLocked,
+        is_locked: false,
       })
       .select()
       .single();
