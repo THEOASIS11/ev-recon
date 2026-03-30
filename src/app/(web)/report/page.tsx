@@ -12,7 +12,6 @@ interface CategoryData {
 interface ProductRow {
   product_id: string;
   product_name: string;
-  sku: string;
   closing: CategoryData | null;
   count: CategoryData | null;
   gap: CategoryData | null;
@@ -275,8 +274,7 @@ export default function ReportPage() {
                             zIndex: 1,
                           }}
                         >
-                          <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827', margin: '0 0 2px', whiteSpace: 'nowrap' }}>{row.product_name}</p>
-                          {row.sku && <p style={{ fontSize: '11px', color: '#9ca3af', margin: 0 }}>{row.sku}</p>}
+                          <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827', margin: 0, whiteSpace: 'nowrap' }}>{row.product_name}</p>
                         </td>
                       )}
 

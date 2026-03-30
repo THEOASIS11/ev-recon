@@ -43,7 +43,8 @@ export async function GET(
   // Fetch products
   const { data: products } = await supabaseAdmin
     .from('products')
-    .select('id, name, sku')
+    .select('id, name')
+    .eq('is_active', true)
     .order('name');
 
   // Find the two key submissions
@@ -94,7 +95,6 @@ export async function GET(
     return {
       product_id: p.id,
       product_name: p.name,
-      sku: p.sku,
       closing,
       count,
       gap,
