@@ -51,6 +51,17 @@ export async function GET(
   const closingStockSub = submissions?.find((s) => s.submission_type === 'closing_stock_furkan');
   const physicalCountSub = submissions?.find((s) => s.submission_type === 'physical_count_arjun');
 
+  // D2: Hide report until BOTH Furkan AND Arjun have submitted
+  // Only block for active cycles — signed_off cycles always show full report
+  if (cycle.status === 'active' && (!closingStockSub || !physicalCountSub)) {
+    return NextResponse.json({
+      status: 'waiting',
+      closing_stock_done: !!closingStockSub,
+      physical_count_done: !!physicalCountSub,
+      message: 'Report hidden until both Furkan and Arjun have submitted.',
+    });
+  }
+
   // Build lookup maps: product name → {sellable, unassembled, defective, total}
   type ProductMap = Map<string, ProductCategoryData>;
 

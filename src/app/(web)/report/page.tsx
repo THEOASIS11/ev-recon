@@ -59,8 +59,16 @@ function GapBadge({ value }: { value: number | null }) {
   );
 }
 
+interface WaitingData {
+  status: 'waiting';
+  closing_stock_done: boolean;
+  physical_count_done: boolean;
+  message: string;
+}
+
 export default function ReportPage() {
   const [report, setReport] = useState<ReportData | null>(null);
+  const [waiting, setWaiting] = useState<WaitingData | null>(null);
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -85,7 +93,13 @@ export default function ReportPage() {
       });
       if (reportRes.ok) {
         const data = await reportRes.json();
-        setReport(data);
+        if (data.status === 'waiting') {
+          setWaiting(data as WaitingData);
+          setReport(null);
+        } else {
+          setReport(data as ReportData);
+          setWaiting(null);
+        }
       }
     } catch { /* silent */ } finally {
       setLoading(false);
@@ -120,6 +134,40 @@ export default function ReportPage() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px' }}>
         <p style={{ color: '#9ca3af' }}>Loading report...</p>
+      </div>
+    );
+  }
+
+  // Waiting state — both haven't submitted yet
+  if (waiting) {
+    return (
+      <div>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 24px' }}>Leakage Report</h1>
+        <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '14px', padding: '40px', textAlign: 'center' }}>
+          <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ fontSize: '18px', fontWeight: '700', color: '#92400e', margin: '0 0 12px' }}>Report Not Yet Available</p>
+          <p style={{ fontSize: '14px', color: '#92400e', margin: '0 0 24px' }}>
+            Both Furkan (closing stock) and Arjun (physical count) must submit before the report is visible.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <div style={{ backgroundColor: waiting.closing_stock_done ? '#f0fdf4' : '#ffffff', border: `1px solid ${waiting.closing_stock_done ? '#bbf7d0' : '#e5e7eb'}`, borderRadius: '10px', padding: '12px 20px', minWidth: '160px' }}>
+              <p style={{ fontSize: '20px', margin: '0 0 4px' }}>{waiting.closing_stock_done ? '✅' : '⏳'}</p>
+              <p style={{ fontSize: '13px', fontWeight: '600', color: waiting.closing_stock_done ? '#16a34a' : '#6b7280', margin: '0 0 2px' }}>Furkan</p>
+              <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Closing Stock</p>
+            </div>
+            <div style={{ backgroundColor: waiting.physical_count_done ? '#f0fdf4' : '#ffffff', border: `1px solid ${waiting.physical_count_done ? '#bbf7d0' : '#e5e7eb'}`, borderRadius: '10px', padding: '12px 20px', minWidth: '160px' }}>
+              <p style={{ fontSize: '20px', margin: '0 0 4px' }}>{waiting.physical_count_done ? '✅' : '⏳'}</p>
+              <p style={{ fontSize: '13px', fontWeight: '600', color: waiting.physical_count_done ? '#16a34a' : '#6b7280', margin: '0 0 2px' }}>Arjun</p>
+              <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Physical Count</p>
+            </div>
+          </div>
+          <button
+            onClick={fetchReport}
+            style={{ marginTop: '24px', padding: '8px 20px', backgroundColor: '#92400e', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            🔄 Refresh Status
+          </button>
+        </div>
       </div>
     );
   }

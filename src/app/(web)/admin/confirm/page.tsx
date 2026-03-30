@@ -24,6 +24,7 @@ interface ReportData {
     cycle_month: string;
     status: string;
     signed_off_at: string | null;
+    signed_off_by: string | null;
     confirmed_at: string | null;
     investigation_notes: string | null;
     returns_in_transit: { amazon: number; flipkart: number };
@@ -41,11 +42,11 @@ interface ReportData {
   };
 }
 
-const CATS: Array<{ key: keyof CategoryData; label: string; color: string }> = [
-  { key: 'sellable', label: 'Sellable', color: '#16a34a' },
-  { key: 'unassembled', label: 'Unassembled', color: '#2563eb' },
-  { key: 'defective', label: 'Defective', color: '#dc2626' },
-  { key: 'total', label: 'Total', color: '#111827' },
+const CATS: Array<{ key: keyof CategoryData; label: string }> = [
+  { key: 'sellable', label: 'Sellable' },
+  { key: 'unassembled', label: 'Unassembled' },
+  { key: 'defective', label: 'Defective' },
+  { key: 'total', label: 'Total' },
 ];
 
 function GapBadge({ value }: { value: number | null }) {
@@ -65,16 +66,15 @@ function GapBadge({ value }: { value: number | null }) {
   );
 }
 
-export default function SignoffPage() {
+export default function AdminConfirmPage() {
   const router = useRouter();
   const [report, setReport] = useState<ReportData | null>(null);
-  const [waitingData, setWaitingData] = useState<{ closing_stock_done: boolean; physical_count_done: boolean } | null>(null);
+  const [waitingData, setWaitingData] = useState<{ closing_stock_done: boolean; physical_count_done: boolean; noSignoff?: boolean } | null>(null);
   const [cycleId, setCycleId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notes, setNotes] = useState('');
-  const [signingOff, setSigningOff] = useState(false);
-  const [alreadySignedOff, setAlreadySignedOff] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmationNotes, setConfirmationNotes] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [alreadyConfirmed, setAlreadyConfirmed] = useState(false);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -102,9 +102,17 @@ export default function SignoffPage() {
         } else {
           setReport(data);
           setWaitingData(null);
-          setNotes(data.cycle.investigation_notes || '');
-          if (data.cycle.signed_off_at) setAlreadySignedOff(true);
-          if (data.cycle.confirmed_at || data.cycle.status === 'signed_off') setConfirmed(true);
+          // Check if Arjun signed off
+          if (!data.cycle.signed_off_at) {
+            setWaitingData({ closing_stock_done: true, physical_count_done: true, noSignoff: true });
+            setReport(null);
+          }
+          // Check if already confirmed by Asis
+          if (data.cycle.confirmed_at || data.cycle.status === 'signed_off') {
+            setAlreadyConfirmed(true);
+            setReport(data);
+            setWaitingData(null);
+          }
         }
       }
     } catch { /* silent */ } finally {
@@ -117,7 +125,7 @@ export default function SignoffPage() {
     if (stored) {
       try {
         const u = JSON.parse(stored);
-        if (u.role !== 'supervisor' && u.role !== 'admin') {
+        if (u.role !== 'admin') {
           router.replace('/dashboard');
           return;
         }
@@ -126,30 +134,30 @@ export default function SignoffPage() {
     fetchData();
   }, [fetchData, router]);
 
-  async function handleSignOff() {
+  async function handleConfirm() {
     if (!cycleId || !token || !report) return;
     const cycleLabel = new Date(report.cycle.cycle_month).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
     const ok = window.confirm(
-      `${cycleLabel} ke liye sign-off confirm karein?\n\nYeh Asis ke paas confirm karne ke liye jayega.`
+      `${cycleLabel} cycle ko permanently close karein?\n\nYeh action undo nahi ho sakti.`
     );
     if (!ok) return;
 
-    setSigningOff(true);
+    setConfirming(true);
     try {
-      const res = await fetch(`/api/v1/cycles/${cycleId}/signoff`, {
+      const res = await fetch(`/api/v1/cycles/${cycleId}/confirm`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ investigation_notes: notes }),
+        body: JSON.stringify({ confirmation_notes: confirmationNotes }),
       });
       if (res.ok) {
-        setAlreadySignedOff(true);
+        setAlreadyConfirmed(true);
         fetchData();
       } else {
         const err = await res.json();
-        alert(err.error || 'Sign-off failed');
+        alert(err.error || 'Confirmation failed');
       }
     } catch { /* silent */ } finally {
-      setSigningOff(false);
+      setConfirming(false);
     }
   }
 
@@ -161,28 +169,25 @@ export default function SignoffPage() {
     );
   }
 
-  // Waiting state
-  if (waitingData) {
+  // Waiting state — submissions not done or Arjun hasn't signed off
+  if (waitingData && !report) {
+    const noSignoff = waitingData.noSignoff;
     return (
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 24px' }}>Sign-off</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 24px' }}>Confirm Cycle</h1>
         <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '14px', padding: '40px', textAlign: 'center' }}>
           <div style={{ fontSize: '40px', marginBottom: '16px' }}>⏳</div>
-          <p style={{ fontSize: '18px', fontWeight: '700', color: '#92400e', margin: '0 0 12px' }}>Report Not Ready Yet</p>
-          <p style={{ fontSize: '14px', color: '#92400e', margin: '0 0 24px' }}>Both Furkan and Arjun must submit before sign-off is available.</p>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <div style={{ backgroundColor: waitingData.closing_stock_done ? '#f0fdf4' : '#ffffff', border: `1px solid ${waitingData.closing_stock_done ? '#bbf7d0' : '#e5e7eb'}`, borderRadius: '10px', padding: '12px 20px' }}>
-              <p style={{ fontSize: '18px', margin: '0 0 4px' }}>{waitingData.closing_stock_done ? '✅' : '⏳'}</p>
-              <p style={{ fontSize: '13px', fontWeight: '600', color: waitingData.closing_stock_done ? '#16a34a' : '#6b7280', margin: 0 }}>Furkan — Closing Stock</p>
-            </div>
-            <div style={{ backgroundColor: waitingData.physical_count_done ? '#f0fdf4' : '#ffffff', border: `1px solid ${waitingData.physical_count_done ? '#bbf7d0' : '#e5e7eb'}`, borderRadius: '10px', padding: '12px 20px' }}>
-              <p style={{ fontSize: '18px', margin: '0 0 4px' }}>{waitingData.physical_count_done ? '✅' : '⏳'}</p>
-              <p style={{ fontSize: '13px', fontWeight: '600', color: waitingData.physical_count_done ? '#16a34a' : '#6b7280', margin: 0 }}>Arjun — Physical Count</p>
-            </div>
-          </div>
+          <p style={{ fontSize: '18px', fontWeight: '700', color: '#92400e', margin: '0 0 12px' }}>
+            {noSignoff ? 'Arjun Ka Sign-off Pending' : 'Data Submission Pending'}
+          </p>
+          <p style={{ fontSize: '14px', color: '#92400e', margin: '0 0 24px' }}>
+            {noSignoff
+              ? 'Arjun (supervisor) ne abhi sign-off nahi kiya hai. Unka sign-off hone ke baad aap confirm kar sakte hain.'
+              : 'Both Furkan aur Arjun ka data submit hona zaroori hai confirm karne se pehle.'}
+          </p>
           <button
             onClick={fetchData}
-            style={{ marginTop: '24px', padding: '8px 20px', backgroundColor: '#92400e', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+            style={{ padding: '8px 20px', backgroundColor: '#92400e', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
           >
             🔄 Refresh
           </button>
@@ -194,7 +199,7 @@ export default function SignoffPage() {
   if (!report) {
     return (
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 24px' }}>Sign-off</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 24px' }}>Confirm Cycle</h1>
         <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '40px', textAlign: 'center' }}>
           <p style={{ color: '#9ca3af', fontSize: '15px' }}>No active cycle found.</p>
         </div>
@@ -212,16 +217,16 @@ export default function SignoffPage() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px' }}>Sign-off</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: '0 0 4px' }}>Confirm Cycle</h1>
         <p style={{ color: '#6b7280', fontSize: '14px', margin: 0 }}>{cycleLabel}</p>
       </div>
 
-      {/* Confirmed by Asis banner */}
-      {confirmed && (
-        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '20px' }}>✅</span>
+      {/* Already confirmed banner */}
+      {alreadyConfirmed && (
+        <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '16px 20px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <span style={{ fontSize: '24px' }}>✅</span>
           <div>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#16a34a', margin: '0 0 2px' }}>Asis ne confirm karke cycle close kar di</p>
+            <p style={{ fontSize: '15px', fontWeight: '700', color: '#16a34a', margin: '0 0 2px' }}>Cycle Confirmed & Closed</p>
             {cycle.confirmed_at && (
               <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
                 {new Date(cycle.confirmed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -231,18 +236,20 @@ export default function SignoffPage() {
         </div>
       )}
 
-      {/* Signed off (awaiting Asis) banner */}
-      {alreadySignedOff && !confirmed && (
-        <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '20px' }}>🔄</span>
-          <div>
-            <p style={{ fontSize: '14px', fontWeight: '700', color: '#1d4ed8', margin: '0 0 2px' }}>Sign-off ho gaya — Asis ke confirmation ka wait kar rahe hain</p>
-            {cycle.signed_off_at && (
-              <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                Signed off: {new Date(cycle.signed_off_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </p>
-            )}
-          </div>
+      {/* Arjun's sign-off info */}
+      {cycle.signed_off_at && (
+        <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px' }}>
+          <p style={{ fontSize: '13px', fontWeight: '600', color: '#1d4ed8', margin: '0 0 4px' }}>
+            ✍️ Arjun ka sign-off: {new Date(cycle.signed_off_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </p>
+          {cycle.investigation_notes && (
+            <p style={{ fontSize: '13px', color: '#374151', margin: '8px 0 0', padding: '10px 14px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #dbeafe', fontStyle: 'italic' }}>
+              &quot;{cycle.investigation_notes}&quot;
+            </p>
+          )}
+          {!cycle.investigation_notes && (
+            <p style={{ fontSize: '12px', color: '#93c5fd', margin: '4px 0 0' }}>Koi investigation notes nahi hain</p>
+          )}
         </div>
       )}
 
@@ -324,54 +331,45 @@ export default function SignoffPage() {
         </div>
       </div>
 
-      {/* Investigation notes */}
-      <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '20px', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Investigation Notes</h2>
-        <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 16px' }}>
-          {alreadySignedOff ? 'Notes jo aapne submit kiye hain:' : 'Sign-off se pehle apne findings document karein. Asis bhi dekh sakenge.'}
-        </p>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          disabled={alreadySignedOff}
-          placeholder="Koi discrepancies, returns expected, ya explanation..."
-          style={{
-            width: '100%', minHeight: '120px', padding: '10px 14px',
-            border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px',
-            color: '#111827', resize: 'vertical', outline: 'none', fontFamily: 'inherit',
-            boxSizing: 'border-box', backgroundColor: alreadySignedOff ? '#f9fafb' : '#ffffff',
-          }}
-        />
-      </div>
-
-      {/* Sign-off button */}
-      {!alreadySignedOff && (
+      {/* Confirmation section */}
+      {!alreadyConfirmed && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '20px', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Step 1: Aapka Sign-off</h2>
+          <h2 style={{ fontSize: '15px', fontWeight: '600', color: '#111827', margin: '0 0 4px' }}>Step 2: Aapka Confirmation (Asis)</h2>
           <p style={{ fontSize: '13px', color: '#9ca3af', margin: '0 0 16px' }}>
-            Sign-off karne ke baad Asis ko notification jayega. Woh confirm karke cycle close karenge.
+            Arjun ka sign-off review karke cycle close karein. Yeh final step hai.
           </p>
-          <button
-            onClick={handleSignOff}
-            disabled={signingOff}
+          <textarea
+            value={confirmationNotes}
+            onChange={(e) => setConfirmationNotes(e.target.value)}
+            placeholder="Confirmation notes (optional) — koi additional comments ya decisions..."
             style={{
-              padding: '10px 28px',
-              background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+              width: '100%', minHeight: '100px', padding: '10px 14px',
+              border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px',
+              color: '#111827', resize: 'vertical', outline: 'none', fontFamily: 'inherit',
+              boxSizing: 'border-box', marginBottom: '16px',
+            }}
+          />
+          <button
+            onClick={handleConfirm}
+            disabled={confirming}
+            style={{
+              padding: '12px 32px',
+              background: 'linear-gradient(135deg, #16a34a, #15803d)',
               color: '#ffffff', border: 'none', borderRadius: '8px',
               fontSize: '14px', fontWeight: '700', cursor: 'pointer',
-              opacity: signingOff ? 0.7 : 1,
+              opacity: confirming ? 0.7 : 1,
             }}
           >
-            {signingOff ? 'Signing Off...' : '✍️ Sign Off — Asis ke paas bhejo'}
+            {confirming ? 'Confirming...' : '✅ Confirm & Close Cycle'}
           </button>
         </div>
       )}
 
-      {/* Info box */}
-      <div style={{ backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '10px', padding: '14px 18px', display: 'flex', gap: '10px' }}>
-        <span>ℹ️</span>
-        <p style={{ fontSize: '13px', color: '#0369a1', margin: 0 }}>
-          Two-step process: Pehle aap sign off karein (Step 1), phir Asis confirm karke cycle officially close karega (Step 2).
+      {/* Info */}
+      <div style={{ backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: '10px', padding: '14px 18px', display: 'flex', gap: '10px' }}>
+        <span>⚠️</span>
+        <p style={{ fontSize: '13px', color: '#92400e', margin: 0 }}>
+          Confirm karne ke baad cycle status permanently &quot;Confirmed & Closed&quot; ho jayegi aur koi changes nahi ho sakte.
         </p>
       </div>
     </div>

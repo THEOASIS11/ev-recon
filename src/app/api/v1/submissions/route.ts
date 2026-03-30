@@ -53,10 +53,8 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/v1/submissions
-// If submission already exists for this user+cycle+type:
-//   - if cycle is signed_off → 403
-//   - otherwise → UPDATE and return 200
-// If no submission exists → INSERT and return 201
+// One submission per type per cycle per user — PERMANENT LOCK.
+// No editing ever. 409 if already submitted.
 export async function POST(request: NextRequest) {
   const auth = requireAuth(request);
   if (auth instanceof NextResponse) return auth;
@@ -83,14 +81,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cycle not found.' }, { status: 404 });
     }
 
-    // Signed-off cycles are fully locked
-    if (cycle.status === 'signed_off') {
-      return NextResponse.json(
-        { error: 'Cycle sign-off ho chuka hai. Ab koi changes nahi ho sakte.' },
-        { status: 403 }
-      );
-    }
-
+    // Only active cycles accept new submissions
     if (cycle.status !== 'active') {
       return NextResponse.json(
         { error: 'Is cycle mein submit nahi kar sakte. Cycle active nahi hai.' },
@@ -107,33 +98,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for existing submission (one per type per cycle per user)
+    // Check for existing submission — PERMANENT LOCK, no editing allowed
     const { data: existing } = await supabaseAdmin
       .from('submissions')
-      .select('id, is_locked')
+      .select('id')
       .eq('cycle_id', cycle_id)
       .eq('user_id', auth.userId)
       .eq('submission_type', submission_type)
       .maybeSingle();
 
     if (existing) {
-      // UPDATE existing submission with new data + fresh timestamp
-      const { data: updated, error: updateError } = await supabaseAdmin
-        .from('submissions')
-        .update({
-          data,
-          submitted_at: new Date().toISOString(),
-          is_locked: false,
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
-      return NextResponse.json({ submission: updated, updated: true }, { status: 200 });
+      return NextResponse.json(
+        { error: 'Aap pehle hi submit kar chuke hain. Data lock hai — koi changes nahi ho sakte.' },
+        { status: 409 }
+      );
     }
 
-    // Insert new submission
+    // Insert new submission — locked immediately
     const { data: submission, error: insertError } = await supabaseAdmin
       .from('submissions')
       .insert({
@@ -141,7 +122,7 @@ export async function POST(request: NextRequest) {
         user_id: auth.userId,
         submission_type,
         data,
-        is_locked: false,
+        is_locked: true,
       })
       .select()
       .single();
