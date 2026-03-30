@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -9,6 +10,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -31,6 +37,7 @@ export default function LoginPage() {
       }
 
       localStorage.setItem('token', json.token);
+      localStorage.setItem('user', JSON.stringify(json.user));
 
       const role: string = json.user.role;
       if (role === 'factory_staff' || role === 'supervisor') {
@@ -47,203 +54,360 @@ export default function LoginPage() {
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #09090b 0%, #0c1222 60%, #09090b 100%)',
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      backgroundColor: '#000000',
     }}>
-      <div style={{ maxWidth: '400px', width: '100%', padding: '0 24px' }}>
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              fontWeight: 800,
-              color: '#fafafa',
-              letterSpacing: '4px',
-              textTransform: 'uppercase',
-              margin: 0,
-              display: 'inline',
-            }}>
-              HUMARA UBOARD
-            </h1>
-            <span style={{
-              fontSize: '11px',
-              color: '#3b82f6',
-              border: '1px solid rgba(59,130,246,0.25)',
-              borderRadius: '20px',
-              padding: '2px 10px',
-              marginLeft: '10px',
-              verticalAlign: 'middle',
-              display: 'inline-block',
-            }}>
-              V1
-            </span>
-          </div>
-          <p style={{
-            fontSize: '14px',
-            color: '#71717a',
-            fontWeight: 300,
-            letterSpacing: '1px',
-            marginTop: '8px',
-          }}>
-            Together we run further
-          </p>
-          <div style={{ width: '40px', height: '1px', backgroundColor: '#27272a', margin: '24px auto 0' }} />
+      {/* ── LEFT PANEL — Brand / Logo ── */}
+      <div style={{
+        flex: '1 1 55%',
+        backgroundColor: '#000000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+
+        {/* Subtle radial glow behind logo */}
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '600px',
+          height: '400px',
+          background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.04) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* UBOARD Logo */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '520px',
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? 'translateY(0)' : 'translateY(16px)',
+          transition: 'opacity 0.6s ease, transform 0.6s ease',
+        }}>
+          <Image
+            src="/uboard-logo.png"
+            alt="UBOARD®"
+            width={520}
+            height={156}
+            style={{ width: '100%', height: 'auto', display: 'block' }}
+            priority
+          />
         </div>
 
-        {/* Error display */}
-        {error && (
-          <div style={{
-            background: '#1c1917',
-            border: '1px solid rgba(239, 68, 68, 0.25)',
-            color: '#fca5a5',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            marginBottom: '16px',
-            fontSize: '14px',
-          }}>
-            {error}
-          </div>
-        )}
+        {/* Divider line */}
+        <div style={{
+          width: '100%',
+          maxWidth: '520px',
+          height: '1px',
+          backgroundColor: 'rgba(255,255,255,0.12)',
+          margin: '32px 0',
+          opacity: mounted ? 1 : 0,
+          transition: 'opacity 0.8s ease 0.2s',
+        }} />
 
-        {/* Form */}
-        <form onSubmit={handleSubmit}>
-          <p style={{
-            fontSize: '16px',
-            color: '#a1a1aa',
-            marginBottom: '20px',
-            textAlign: 'center',
-          }}>
-            Login karo
-          </p>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{
-              fontSize: '12px',
-              color: '#71717a',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '6px',
-              display: 'block',
-            }}>
-              Username
-            </label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              placeholder="humarauboard..."
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={{
-                background: '#111113',
-                border: '1px solid #27272a',
-                borderRadius: '12px',
-                padding: '14px 16px',
-                fontSize: '16px',
-                color: '#fafafa',
-                width: '100%',
-                outline: 'none',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.12)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#27272a';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              fontSize: '12px',
-              color: '#71717a',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '6px',
-              display: 'block',
-            }}>
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              placeholder="••••••••"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                background: '#111113',
-                border: '1px solid #27272a',
-                borderRadius: '12px',
-                padding: '14px 16px',
-                fontSize: '16px',
-                color: '#fafafa',
-                width: '100%',
-                outline: 'none',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#3b82f6';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.12)';
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#27272a';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '16px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: 'white',
-              fontWeight: 600,
-              fontSize: '16px',
-              border: 'none',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1,
-              transition: 'transform 0.1s ease',
-              transform: loading ? 'scale(1)' : 'scale(1)',
-            }}
-            onMouseDown={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'scale(0.98)';
-              }
-            }}
-            onMouseUp={(e) => {
-              if (!loading) {
-                e.currentTarget.style.transform = 'scale(1)';
-              }
-            }}
-          >
-            {loading ? 'Connecting...' : 'Login Karo →'}
-          </button>
-        </form>
-
-        <p style={{
-          fontSize: '12px',
-          color: '#71717a',
-          textAlign: 'center',
-          marginTop: '16px',
+        {/* Tagline */}
+        <div style={{
+          width: '100%',
+          maxWidth: '520px',
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? 'translateY(0)' : 'translateY(8px)',
+          transition: 'opacity 0.6s ease 0.3s, transform 0.6s ease 0.3s',
         }}>
-          Password bhool gaye? Admin se poocho.
-        </p>
+          <p style={{
+            fontSize: '13px',
+            color: 'rgba(255,255,255,0.35)',
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+            margin: '0 0 8px',
+            fontWeight: 500,
+          }}>
+            Humara UBoard
+          </p>
+          <p style={{
+            fontSize: '18px',
+            color: 'rgba(255,255,255,0.75)',
+            fontWeight: 300,
+            margin: '0 0 6px',
+            lineHeight: 1.4,
+          }}>
+            EV Inventory Reconciliation
+          </p>
+          <p style={{
+            fontSize: '13px',
+            color: 'rgba(255,255,255,0.28)',
+            margin: 0,
+            fontStyle: 'italic',
+          }}>
+            Together we run further.
+          </p>
+        </div>
+
+        {/* Version badge bottom-left */}
+        <div style={{
+          position: 'absolute',
+          bottom: '28px',
+          left: '48px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <div style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            backgroundColor: '#22c55e',
+            boxShadow: '0 0 6px #22c55e',
+          }} />
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', letterSpacing: '1px' }}>
+            SYSTEM ONLINE · V1
+          </span>
+        </div>
       </div>
+
+      {/* ── RIGHT PANEL — Login Form ── */}
+      <div style={{
+        flex: '0 0 400px',
+        backgroundColor: '#0a0a0c',
+        borderLeft: '1px solid rgba(255,255,255,0.07)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '48px 40px',
+      }}>
+
+        <div style={{
+          width: '100%',
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? 'translateY(0)' : 'translateY(12px)',
+          transition: 'opacity 0.6s ease 0.15s, transform 0.6s ease 0.15s',
+        }}>
+
+          {/* Form header */}
+          <div style={{ marginBottom: '36px' }}>
+            <h2 style={{
+              fontSize: '22px',
+              fontWeight: 700,
+              color: '#ffffff',
+              margin: '0 0 6px',
+            }}>
+              Welcome back
+            </h2>
+            <p style={{
+              fontSize: '14px',
+              color: 'rgba(255,255,255,0.4)',
+              margin: 0,
+            }}>
+              Apna account access karo
+            </p>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.25)',
+              color: '#fca5a5',
+              borderRadius: '10px',
+              padding: '11px 14px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'flex-start',
+            }}>
+              <span style={{ flexShrink: 0 }}>⚠</span>
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit}>
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{
+                fontSize: '11px',
+                color: 'rgba(255,255,255,0.4)',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '8px',
+                display: 'block',
+                fontWeight: 600,
+              }}>
+                Username
+              </label>
+              <input
+                type="text"
+                placeholder="humarauboard..."
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  fontSize: '15px',
+                  color: '#ffffff',
+                  width: '100%',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.05)';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '28px' }}>
+              <label style={{
+                fontSize: '11px',
+                color: 'rgba(255,255,255,0.4)',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '8px',
+                display: 'block',
+                fontWeight: 600,
+              }}>
+                Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••••"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '10px',
+                  padding: '14px 16px',
+                  fontSize: '15px',
+                  color: '#ffffff',
+                  width: '100%',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.05)';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '15px',
+                borderRadius: '10px',
+                background: loading ? 'rgba(255,255,255,0.08)' : '#ffffff',
+                color: loading ? 'rgba(255,255,255,0.4)' : '#000000',
+                fontWeight: 700,
+                fontSize: '15px',
+                border: 'none',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.2s, transform 0.1s, opacity 0.2s',
+                letterSpacing: '0.3px',
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.background = '#e5e5e5';
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.background = '#ffffff';
+              }}
+              onMouseDown={(e) => {
+                if (!loading) e.currentTarget.style.transform = 'scale(0.985)';
+              }}
+              onMouseUp={(e) => {
+                if (!loading) e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span style={{
+                    width: '14px', height: '14px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTopColor: '#ffffff',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    animation: 'spin 0.7s linear infinite',
+                  }} />
+                  Connecting...
+                </span>
+              ) : (
+                'Login Karo →'
+              )}
+            </button>
+          </form>
+
+          <p style={{
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.2)',
+            textAlign: 'center',
+            marginTop: '20px',
+          }}>
+            Password bhool gaye? Admin se poocho.
+          </p>
+        </div>
+
+        {/* Bottom brand mark */}
+        <div style={{
+          position: 'absolute',
+          bottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}>
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.15)', letterSpacing: '0.5px' }}>
+            UBOARD® Internal Platform
+          </span>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        @media (max-width: 768px) {
+          main > div:first-child {
+            display: none !important;
+          }
+          main > div:last-child {
+            flex: 1 1 100% !important;
+            border-left: none !important;
+          }
+        }
+        input::placeholder {
+          color: rgba(255,255,255,0.2);
+        }
+      `}</style>
     </main>
   );
 }
