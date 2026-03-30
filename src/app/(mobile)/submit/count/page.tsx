@@ -9,9 +9,31 @@ interface Product {
   name: string;
 }
 
+interface ProductEntry {
+  sellable: string;
+  unassembled: string;
+  defective: string;
+}
+
 function parseNum(s: string): number {
   const n = parseInt(s, 10);
   return isNaN(n) || n < 0 ? 0 : n;
+}
+
+function entryTotal(e: ProductEntry): number {
+  return parseNum(e.sellable) + parseNum(e.unassembled) + parseNum(e.defective);
+}
+
+// A product is "done" if ANY of its 3 fields has been touched (even 0 counts)
+function isEntryDone(e: ProductEntry): boolean {
+  return e.sellable !== '' || e.unassembled !== '' || e.defective !== '';
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 export default function PhysicalCountPage() {
@@ -19,14 +41,15 @@ export default function PhysicalCountPage() {
   const router = useRouter();
 
   const [cycleId, setCycleId] = useState<string | null>(null);
+  const [cycleStatus, setCycleStatus] = useState<string>('active');
   const [products, setProducts] = useState<Product[]>([]);
-  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [entries, setEntries] = useState<Record<string, ProductEntry>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [alreadyDone, setAlreadyDone] = useState(false);
+  const [initLoading, setInitLoading] = useState(true);
+  const [existingSubmission, setExistingSubmission] = useState<{ id: string; submitted_at: string } | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
-  const [initLoading, setInitLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     if (!token || !user) return;
@@ -40,15 +63,21 @@ export default function PhysicalCountPage() {
         const json = await cycleRes.json();
         if (json.cycle) {
           setCycleId(json.cycle.id);
+          setCycleStatus(json.cycle.status);
+
+          // Load existing submission if any
           const subRes = await fetch(`/api/v1/submissions/me?cycle_id=${json.cycle.id}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (subRes.ok) {
             const subJson = await subRes.json();
-            const done = (subJson.submissions || []).some(
-              (s: { submission_type: string }) => s.submission_type === 'physical_count_arjun'
+            const existing = (subJson.submissions || []).find(
+              (s: { submission_type: string; id: string; submitted_at: string; data: unknown }) =>
+                s.submission_type === 'physical_count_arjun'
             );
-            setAlreadyDone(done);
+            if (existing) {
+              setExistingSubmission({ id: existing.id, submitted_at: existing.submitted_at });
+            }
           }
         }
       }
@@ -57,9 +86,11 @@ export default function PhysicalCountPage() {
         const json = await prodRes.json();
         const prods: Product[] = json.products || [];
         setProducts(prods);
-        const initial: Record<string, string> = {};
-        prods.forEach((p) => { initial[p.id] = ''; });
-        setQuantities(initial);
+
+        // Initialize empty entries — will be overwritten if existing submission found
+        const initial: Record<string, ProductEntry> = {};
+        prods.forEach((p) => { initial[p.id] = { sellable: '', unassembled: '', defective: '' }; });
+        setEntries(initial);
         if (prods.length > 0) setExpanded(prods[0].id);
       }
     } catch {
@@ -69,25 +100,93 @@ export default function PhysicalCountPage() {
     }
   }, [token, user]);
 
+  // Second pass: once we have products AND an existing submission, load the saved values
+  const loadExistingValues = useCallback(async () => {
+    if (!token || !existingSubmission || products.length === 0) return;
+    try {
+      const subRes = await fetch(`/api/v1/submissions/me?cycle_id=${cycleId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!subRes.ok) return;
+      const subJson = await subRes.json();
+      const existing = (subJson.submissions || []).find(
+        (s: { submission_type: string }) => s.submission_type === 'physical_count_arjun'
+      );
+      if (!existing?.data?.products) return;
+
+      const savedEntries: Record<string, ProductEntry> = {};
+      products.forEach((p) => { savedEntries[p.id] = { sellable: '', unassembled: '', defective: '' }; });
+
+      (existing.data.products as Array<{ product: string; sellable: number; unassembled: number; defective: number }>).forEach((item) => {
+        const prod = products.find((p) => p.name === item.product);
+        if (prod) {
+          savedEntries[prod.id] = {
+            sellable: String(item.sellable ?? ''),
+            unassembled: String(item.unassembled ?? ''),
+            defective: String(item.defective ?? ''),
+          };
+        }
+      });
+      setEntries(savedEntries);
+    } catch {
+      // silent
+    }
+  }, [token, existingSubmission, products, cycleId]);
+
   useEffect(() => {
     if (ready && token && user) fetchData();
   }, [ready, token, user, fetchData]);
 
+  useEffect(() => {
+    if (existingSubmission && products.length > 0) loadExistingValues();
+  }, [existingSubmission, products, loadExistingValues]);
+
   if (!ready || !user) return null;
 
-  const filledCount = products.filter((p) => quantities[p.id] !== '').length;
-  const allFilled = filledCount === products.length && products.length > 0;
-  const grandTotal = products.reduce((acc, p) => acc + parseNum(quantities[p.id] ?? ''), 0);
+  // Computed totals
+  const totals = products.reduce(
+    (acc, p) => {
+      const e = entries[p.id] ?? { sellable: '', unassembled: '', defective: '' };
+      acc.sellable += parseNum(e.sellable);
+      acc.unassembled += parseNum(e.unassembled);
+      acc.defective += parseNum(e.defective);
+      acc.total += entryTotal(e);
+      return acc;
+    },
+    { sellable: 0, unassembled: 0, defective: 0, total: 0 }
+  );
+
+  const doneCount = products.filter((p) => isEntryDone(entries[p.id] ?? { sellable: '', unassembled: '', defective: '' })).length;
+  const allDone = doneCount === products.length && products.length > 0;
+  const isReadOnly = cycleStatus === 'signed_off';
+
+  function setField(productId: string, field: keyof ProductEntry, value: string) {
+    setEntries((prev) => ({ ...prev, [productId]: { ...prev[productId], [field]: value } }));
+  }
 
   async function handleSubmit() {
-    if (!token || !cycleId || !allFilled) return;
+    if (!token || !cycleId || !allDone || isReadOnly) return;
     setLoading(true);
     setError('');
     try {
-      const countsData = products.map((p) => ({
-        product: p.name,
-        count: parseNum(quantities[p.id] ?? ''),
-      }));
+      const productsData = products.map((p) => {
+        const e = entries[p.id] ?? { sellable: '', unassembled: '', defective: '' };
+        return {
+          product: p.name,
+          sellable: parseNum(e.sellable),
+          unassembled: parseNum(e.unassembled),
+          defective: parseNum(e.defective),
+          total: entryTotal(e),
+        };
+      });
+
+      // Grand total aggregate
+      const grand_total = {
+        sellable: totals.sellable,
+        unassembled: totals.unassembled,
+        defective: totals.defective,
+        total: totals.total,
+      };
 
       const res = await fetch('/api/v1/submissions', {
         method: 'POST',
@@ -95,13 +194,18 @@ export default function PhysicalCountPage() {
         body: JSON.stringify({
           cycle_id: cycleId,
           submission_type: 'physical_count_arjun',
-          data: { counts: countsData, grand_total: grandTotal },
+          data: { products: productsData, grand_total },
         }),
       });
 
-      if (res.ok || res.status === 409) {
+      if (res.ok) {
+        const json = await res.json();
+        setExistingSubmission({ id: json.submission.id, submitted_at: json.submission.submitted_at });
         setSuccess(true);
-        setTimeout(() => router.push('/home'), 2200);
+        setTimeout(() => {
+          setSuccess(false);
+          router.push('/home');
+        }, 2200);
       } else {
         const json = await res.json();
         setError(json.error || 'Kuch gadbad ho gayi');
@@ -132,33 +236,10 @@ export default function PhysicalCountPage() {
               <polyline className="s-check" points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <p className="s-txt" style={{color:'#22c55e',fontSize:'22px',fontWeight:700,margin:'0 0 8px'}}>Lock ho gaya!</p>
-          <p className="s-sub" style={{color:'#71717a',fontSize:'14px',margin:0}}>Count submit ho gaya. Home par ja rahe hain...</p>
-        </div>
-      </>
-    );
-  }
-
-  // ── Already done ───────────────────────────────────────────────────────────
-  if (alreadyDone) {
-    return (
-      <>
-        <style>{`
-          @keyframes scaleIn{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
-          @keyframes fadeUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}
-          .s-ring{animation:scaleIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275) forwards;}
-          .s-txt{opacity:0;animation:fadeUp 0.4s ease 0.3s forwards;}
-          .s-sub{opacity:0;animation:fadeUp 0.4s ease 0.45s forwards;}
-        `}</style>
-        <div style={{padding:'40px 24px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'70vh'}}>
-          <div className="s-ring" style={{width:'88px',height:'88px',borderRadius:'50%',background:'rgba(34,197,94,0.12)',border:'2px solid #22c55e',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'24px'}}>
-            <svg width="40" height="40" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="#22c55e">
-              <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <p className="s-txt" style={{color:'#22c55e',fontSize:'22px',fontWeight:700,margin:'0 0 8px'}}>Pehle se ho gaya!</p>
-          <p className="s-sub" style={{color:'#71717a',fontSize:'14px',margin:'0 0 28px',textAlign:'center'}}>Physical count pehle hi submit aur lock ho chuka hai.</p>
-          <button onClick={()=>router.push('/home')} style={{color:'#3b82f6',background:'none',border:'none',fontSize:'15px',cursor:'pointer',fontFamily:'inherit'}}>← Home par Jao</button>
+          <p className="s-txt" style={{color:'#22c55e',fontSize:'22px',fontWeight:700,margin:'0 0 8px'}}>
+            {existingSubmission ? 'Update ho gaya!' : 'Submit ho gaya!'}
+          </p>
+          <p className="s-sub" style={{color:'#71717a',fontSize:'14px',margin:0}}>Home screen par ja rahe hain...</p>
         </div>
       </>
     );
@@ -178,14 +259,16 @@ export default function PhysicalCountPage() {
     <>
       <style>{`
         * { box-sizing: border-box; }
+
+        /* Input */
         .pc-input {
           width: 100%;
-          background: #18181b;
+          background: #09090b;
           border: 1px solid #27272a;
-          border-radius: 12px;
-          padding: 12px 16px;
-          font-size: 28px;
-          font-weight: 700;
+          border-radius: 10px;
+          padding: 14px;
+          font-size: 20px;
+          font-weight: 600;
           color: #fafafa;
           text-align: center;
           outline: none;
@@ -194,19 +277,28 @@ export default function PhysicalCountPage() {
         }
         .pc-input:focus {
           border-color: #3b82f6;
-          box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
         }
-        .pc-input::placeholder { color: #52525b; font-weight: 400; font-size: 22px; }
-        .accordion-item {
-          background: #111113;
-          border: 1px solid #27272a;
-          border-radius: 16px;
+        .pc-input::placeholder { color: #3f3f46; font-weight: 400; font-size: 18px; }
+        .pc-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Accordion */
+        .acc-item {
+          border-radius: 14px;
           overflow: hidden;
           transition: border-color 0.15s ease;
+          border: 1px solid #27272a;
+          background: #111113;
         }
-        .accordion-item.open { border-color: #3b82f6; }
-        .accordion-item.filled:not(.open) { border-color: rgba(34,197,94,0.35); }
-        .accordion-header {
+        .acc-item.open {
+          background: #18181b;
+          border-color: #3b82f6;
+          box-shadow: 0 0 20px rgba(59,130,246,0.06);
+        }
+        .acc-item.done:not(.open) {
+          border-left: 3px solid #22c55e;
+        }
+        .acc-header {
           display: flex;
           align-items: center;
           gap: 12px;
@@ -218,164 +310,293 @@ export default function PhysicalCountPage() {
           text-align: left;
           font-family: inherit;
         }
-        .accordion-body {
+        .acc-header:disabled { cursor: default; }
+        .acc-body {
           max-height: 0;
           overflow: hidden;
           transition: max-height 0.25s ease;
         }
-        .accordion-body.open { max-height: 180px; }
-        .submit-btn {
+        .acc-body.open { max-height: 400px; }
+
+        /* Submit btn */
+        .sub-btn {
           width: 100%;
-          height: 52px;
+          height: 56px;
           border-radius: 14px;
           font-size: 16px;
           font-weight: 700;
           border: none;
           font-family: inherit;
           cursor: pointer;
-          transition: opacity 0.2s ease, transform 0.1s ease;
+          transition: opacity 0.15s ease, transform 0.1s ease;
         }
-        .submit-btn.active { background: linear-gradient(135deg,#22c55e,#16a34a); color:#fff; }
-        .submit-btn.active:hover { opacity: 0.88; transform: scale(0.99); }
-        .submit-btn.active:active { transform: scale(0.97); }
-        .submit-btn.inactive { background: #18181b; color: #52525b; cursor: not-allowed; }
-        .back-btn { background:none;border:none;cursor:pointer;color:#71717a;padding:4px;transition:color 0.15s; }
+        .sub-btn.on { background: linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; }
+        .sub-btn.on:hover { opacity:.88; }
+        .sub-btn.on:active { transform:scale(0.98); }
+        .sub-btn.off { background:#18181b; color:#71717a; cursor:not-allowed; }
+
+        .back-btn { background:none;border:none;cursor:pointer;color:#71717a;padding:4px;font-family:inherit;transition:color 0.15s; }
         .back-btn:hover { color:#a1a1aa; }
+        .field-label { font-size:13px; color:#a1a1aa; margin-bottom:6px; display:block; }
       `}</style>
 
-      {/* Header */}
-      <div style={{padding:'28px 16px 0'}}>
-        <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'6px'}}>
-          <button onClick={()=>router.push('/home')} className="back-btn">
-            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      {/* Page wrapper */}
+      <div style={{paddingBottom:'200px'}}>
+
+        {/* ── Header ── */}
+        <div style={{padding:'28px 16px 0'}}>
+          <button onClick={()=>router.push('/home')} className="back-btn" style={{display:'flex',alignItems:'center',gap:'6px',marginBottom:'12px',fontSize:'14px'}}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <polyline points="15 18 9 12 15 6"/>
             </svg>
+            Back
           </button>
-          <h1 style={{color:'#fafafa',fontSize:'20px',fontWeight:700,margin:0}}>Physical Count — Khud Gino</h1>
-        </div>
-        <p style={{color:'#71717a',fontSize:'13px',paddingLeft:'36px',marginBottom:'16px'}}>
-          {filledCount}/{products.length} products filled
-        </p>
+          <h1 style={{color:'#fafafa',fontSize:'22px',fontWeight:700,margin:'0 0 6px'}}>Physical Count</h1>
+          <p style={{color:'#71717a',fontSize:'13px',margin:'0 0 16px',lineHeight:1.5}}>
+            Count each product yourself. Do not ask anyone for numbers.
+          </p>
 
-        {/* Lock warning */}
+          {/* Lock warning banner */}
+          <div style={{
+            background:'rgba(239,68,68,0.06)',
+            border:'1px solid rgba(239,68,68,0.2)',
+            borderRadius:'12px',
+            padding:'10px 14px',
+            marginBottom:'16px',
+            display:'flex',
+            alignItems:'flex-start',
+            gap:'10px',
+          }}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2} style={{flexShrink:0,marginTop:'1px'}}>
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <p style={{color:'#fca5a5',fontSize:'12px',margin:0,lineHeight:1.5}}>
+              Yeh numbers sirf aap khud count karke daalein. Kisi se poochh ke mat daalein.
+            </p>
+          </div>
+
+          {/* Edit mode banner */}
+          {existingSubmission && !isReadOnly && (
+            <div style={{
+              background:'rgba(59,130,246,0.08)',
+              border:'1px solid rgba(59,130,246,0.25)',
+              borderRadius:'12px',
+              padding:'10px 14px',
+              marginBottom:'16px',
+              display:'flex',
+              alignItems:'flex-start',
+              gap:'10px',
+            }}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#3b82f6" strokeWidth={2} style={{flexShrink:0,marginTop:'1px'}}>
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <p style={{color:'#93c5fd',fontSize:'12px',margin:0,lineHeight:1.5}}>
+                Submitted on {formatDate(existingSubmission.submitted_at)}. You can edit and resubmit until the cycle is signed off.
+              </p>
+            </div>
+          )}
+
+          {/* Signed-off banner */}
+          {isReadOnly && (
+            <div style={{
+              background:'rgba(239,68,68,0.08)',
+              border:'1px solid rgba(239,68,68,0.25)',
+              borderRadius:'12px',
+              padding:'10px 14px',
+              marginBottom:'16px',
+              display:'flex',
+              gap:'10px',
+            }}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2} style={{flexShrink:0,marginTop:'1px'}}>
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <p style={{color:'#fca5a5',fontSize:'12px',margin:0,lineHeight:1.5}}>
+                Cycle sign-off ho chuka hai. Ab koi changes nahi kar sakte.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Sticky totals bar ── */}
         <div style={{
-          marginLeft:'36px',
-          background:'rgba(239,68,68,0.06)',
-          border:'1px solid rgba(239,68,68,0.2)',
-          borderRadius:'12px',
-          padding:'10px 14px',
-          marginBottom:'20px',
-          display:'flex',
-          alignItems:'flex-start',
-          gap:'10px',
+          position:'sticky',
+          top:0,
+          zIndex:20,
+          margin:'0 16px 16px',
+          background:'#111113',
+          border:'1px solid #27272a',
+          borderRadius:'14px',
+          padding:'14px 16px',
         }}>
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2} style={{flexShrink:0,marginTop:'1px'}}>
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <p style={{color:'#fca5a5',fontSize:'12px',margin:0,lineHeight:1.5}}>
-            Submit karne ke baad count lock ho jayega. Dobara submit nahi kar sakte.
+          {/* 4-column totals */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'8px',marginBottom:'10px'}}>
+            {[
+              {label:'Sellable', value:totals.sellable, color:'#22c55e'},
+              {label:'Unassembled', value:totals.unassembled, color:'#3b82f6'},
+              {label:'Defective', value:totals.defective, color:'#ef4444'},
+              {label:'Total', value:totals.total, color:'#fafafa'},
+            ].map(({label,value,color})=>(
+              <div key={label} style={{textAlign:'center'}}>
+                <p style={{fontSize:'10px',color:'#71717a',textTransform:'uppercase',letterSpacing:'0.5px',margin:'0 0 3px',fontWeight:600}}>{label}</p>
+                <p style={{fontSize:'20px',fontWeight:700,color,margin:0,lineHeight:1}}>{value}</p>
+              </div>
+            ))}
+          </div>
+          {/* Progress bar */}
+          <div style={{height:'3px',background:'#27272a',borderRadius:'99px',overflow:'hidden',marginBottom:'6px'}}>
+            <div style={{
+              height:'100%',
+              background:'#3b82f6',
+              borderRadius:'99px',
+              width:`${products.length>0 ? (doneCount/products.length)*100 : 0}%`,
+              transition:'width 0.3s ease',
+            }}/>
+          </div>
+          <p style={{fontSize:'11px',color:'#71717a',margin:0,textAlign:'right'}}>
+            {doneCount}/{products.length} products done
           </p>
         </div>
-      </div>
 
-      {/* Accordion list */}
-      <div style={{padding:'0 16px',paddingBottom:'160px',display:'flex',flexDirection:'column',gap:'10px'}}>
-        {products.map((p, idx) => {
-          const qty = quantities[p.id] ?? '';
-          const isOpen = expanded === p.id;
-          const filled = qty !== '';
-          const count = parseNum(qty);
+        {/* ── Accordion product list ── */}
+        <div style={{padding:'0 16px',display:'flex',flexDirection:'column',gap:'10px'}}>
+          {products.map((p, idx) => {
+            const e = entries[p.id] ?? {sellable:'',unassembled:'',defective:''};
+            const isOpen = expanded === p.id;
+            const done = isEntryDone(e);
+            const total = entryTotal(e);
 
-          return (
-            <div
-              key={p.id}
-              className={`accordion-item${isOpen ? ' open' : ''}${filled && !isOpen ? ' filled' : ''}`}
-            >
-              <button
-                className="accordion-header"
-                onClick={() => setExpanded(isOpen ? null : p.id)}
-              >
-                {/* Status dot */}
-                <div style={{
-                  width:'32px',height:'32px',borderRadius:'50%',flexShrink:0,
-                  background: filled ? 'rgba(34,197,94,0.12)' : isOpen ? 'rgba(59,130,246,0.12)' : '#18181b',
-                  border:`2px solid ${filled ? '#22c55e' : isOpen ? '#3b82f6' : '#3f3f46'}`,
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  transition:'all 0.15s ease',
-                }}>
-                  {filled ? (
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#22c55e" strokeWidth={2.5}>
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  ) : (
-                    <span style={{color:isOpen?'#3b82f6':'#71717a',fontSize:'11px',fontWeight:700}}>{idx+1}</span>
-                  )}
-                </div>
-
-                <div style={{flex:1,minWidth:0}}>
-                  <p style={{color:filled?'#22c55e':'#fafafa',fontSize:'15px',fontWeight:600,margin:0,lineHeight:1.2}}>
-                    {p.name}
-                  </p>
-                  {filled && !isOpen && (
-                    <p style={{color:'#71717a',fontSize:'12px',margin:'2px 0 0'}}>
-                      Count: <span style={{color:'#a1a1aa',fontWeight:600}}>{count}</span>
-                    </p>
-                  )}
-                </div>
-
-                <svg
-                  width="18" height="18" fill="none" viewBox="0 0 24 24"
-                  stroke={isOpen?'#3b82f6':'#52525b'} strokeWidth={2}
-                  style={{transition:'transform 0.2s ease',transform:isOpen?'rotate(90deg)':'none',flexShrink:0}}
+            return (
+              <div key={p.id} className={`acc-item${isOpen?' open':''}${done&&!isOpen?' done':''}`}>
+                <button
+                  className="acc-header"
+                  onClick={()=>setExpanded(isOpen ? null : p.id)}
+                  disabled={isReadOnly}
                 >
-                  <polyline points="9 18 15 12 9 6"/>
-                </svg>
-              </button>
+                  {/* Status indicator */}
+                  <div style={{
+                    width:'32px',height:'32px',borderRadius:'50%',flexShrink:0,
+                    background: done ? 'rgba(34,197,94,0.12)' : isOpen ? 'rgba(59,130,246,0.12)' : '#18181b',
+                    border:`2px solid ${done ? '#22c55e' : isOpen ? '#3b82f6' : '#3f3f46'}`,
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    transition:'all 0.15s ease',
+                  }}>
+                    {done ? (
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#22c55e" strokeWidth={2.5}>
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    ) : (
+                      <span style={{color:isOpen?'#3b82f6':'#71717a',fontSize:'11px',fontWeight:700}}>{idx+1}</span>
+                    )}
+                  </div>
 
-              <div className={`accordion-body${isOpen ? ' open' : ''}`}>
-                <div style={{padding:'0 16px 16px'}}>
-                  <p style={{color:'#71717a',fontSize:'11px',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.8px',marginBottom:'8px'}}>
-                    Physical Count
-                  </p>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min="0"
-                    placeholder="0"
-                    value={qty}
-                    onChange={(ev)=>setQuantities({...quantities,[p.id]:ev.target.value})}
-                    className="pc-input"
-                    autoFocus={isOpen}
-                  />
-                  {idx < products.length - 1 && (
-                    <div style={{display:'flex',justifyContent:'flex-end',marginTop:'10px'}}>
-                      <button
-                        onClick={()=>setExpanded(products[idx+1].id)}
-                        style={{
-                          background:'rgba(59,130,246,0.12)',
-                          border:'1px solid rgba(59,130,246,0.25)',
-                          borderRadius:'8px',
-                          color:'#60a5fa',
-                          fontSize:'12px',
-                          fontWeight:600,
-                          padding:'5px 12px',
-                          cursor:'pointer',
-                          fontFamily:'inherit',
-                        }}
+                  {/* Name + summary */}
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{
+                      color: done ? '#fafafa' : '#a1a1aa',
+                      fontSize:'15px',fontWeight:done?600:400,margin:0,lineHeight:1.2,
+                    }}>
+                      {done && <span style={{color:'#22c55e',marginRight:'4px'}}>✓</span>}
+                      {p.name}
+                    </p>
+                    {done && !isOpen && (
+                      <p style={{color:'#71717a',fontSize:'12px',margin:'3px 0 0'}}>
+                        Sellable: {parseNum(e.sellable)} · Unassembled: {parseNum(e.unassembled)} · Defective: {parseNum(e.defective)}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Right: total or chevron */}
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    {done ? (
+                      <span style={{color:'#3b82f6',fontSize:'16px',fontWeight:700}}>
+                        {total}
+                      </span>
+                    ) : (
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"
+                        stroke={isOpen?'#3b82f6':'#52525b'} strokeWidth={2}
+                        style={{transition:'transform 0.2s ease',transform:isOpen?'rotate(90deg)':'none'}}
                       >
-                        Agla →
-                      </button>
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    )}
+                  </div>
+                </button>
+
+                {/* Expanded body */}
+                <div className={`acc-body${isOpen?' open':''}`}>
+                  <div style={{padding:'0 16px 20px'}}>
+                    <p style={{color:'#fafafa',fontSize:'16px',fontWeight:700,margin:'0 0 16px'}}>{p.name}</p>
+
+                    <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+                      {/* Sellable */}
+                      <div>
+                        <label className="field-label">Sellable</label>
+                        <input
+                          type="number" inputMode="numeric" min="0" placeholder="0"
+                          value={e.sellable}
+                          onChange={(ev)=>setField(p.id,'sellable',ev.target.value)}
+                          className="pc-input"
+                          disabled={isReadOnly}
+                          autoFocus={isOpen && !done}
+                        />
+                      </div>
+                      {/* Unassembled */}
+                      <div>
+                        <label className="field-label">Unassembled</label>
+                        <input
+                          type="number" inputMode="numeric" min="0" placeholder="0"
+                          value={e.unassembled}
+                          onChange={(ev)=>setField(p.id,'unassembled',ev.target.value)}
+                          className="pc-input"
+                          disabled={isReadOnly}
+                        />
+                      </div>
+                      {/* Defective */}
+                      <div>
+                        <label className="field-label">Defective</label>
+                        <input
+                          type="number" inputMode="numeric" min="0" placeholder="0"
+                          value={e.defective}
+                          onChange={(ev)=>setField(p.id,'defective',ev.target.value)}
+                          className="pc-input"
+                          disabled={isReadOnly}
+                        />
+                      </div>
                     </div>
-                  )}
+
+                    {/* Live total + next button */}
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'14px'}}>
+                      <span style={{color:'#3b82f6',fontSize:'16px',fontWeight:700}}>
+                        Total: {total}
+                      </span>
+                      {idx < products.length - 1 && (
+                        <button
+                          onClick={()=>setExpanded(products[idx+1].id)}
+                          style={{
+                            background:'rgba(59,130,246,0.12)',
+                            border:'1px solid rgba(59,130,246,0.25)',
+                            borderRadius:'8px',
+                            color:'#60a5fa',
+                            fontSize:'13px',
+                            fontWeight:600,
+                            padding:'6px 14px',
+                            cursor:'pointer',
+                            fontFamily:'inherit',
+                          }}
+                        >
+                          Next →
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* Sticky bottom bar */}
+      {/* ── Sticky bottom bar ── */}
       <div style={{
         position:'fixed',
         bottom:64,
@@ -383,21 +604,19 @@ export default function PhysicalCountPage() {
         transform:'translateX(-50%)',
         width:'100%',
         maxWidth:'480px',
-        background:'rgba(17,17,19,0.95)',
+        background:'rgba(9,9,11,0.97)',
         borderTop:'1px solid #27272a',
-        backdropFilter:'blur(10px)',
-        WebkitBackdropFilter:'blur(10px)',
-        padding:'12px 16px',
+        backdropFilter:'blur(12px)',
+        WebkitBackdropFilter:'blur(12px)',
+        padding:'14px 16px',
         zIndex:50,
       }}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
-          <span style={{color:'#71717a',fontSize:'12px'}}>
-            <span style={{color:'#a1a1aa',fontWeight:600}}>{filledCount}</span>/{products.length} filled
-          </span>
-          <span style={{color:'#71717a',fontSize:'12px'}}>
-            Grand Total: <span style={{color:'#3b82f6',fontWeight:700,fontSize:'14px'}}>{grandTotal}</span>
-          </span>
-        </div>
+        {/* Progress text */}
+        <p style={{color:'#71717a',fontSize:'12px',margin:'0 0 10px',textAlign:'center'}}>
+          {allDone
+            ? `${products.length}/${products.length} products done — ready to submit`
+            : `${doneCount}/${products.length} done — ${products.length-doneCount} remaining`}
+        </p>
 
         {error && (
           <div style={{
@@ -409,17 +628,19 @@ export default function PhysicalCountPage() {
           </div>
         )}
 
-        <button
-          onClick={handleSubmit}
-          disabled={!allFilled || loading}
-          className={`submit-btn ${allFilled && !loading ? 'active' : 'inactive'}`}
-        >
-          {loading
-            ? 'Submit ho raha hai...'
-            : allFilled
-            ? '🔒 Lock Karke Submit Karo'
-            : `${products.length - filledCount} products baaki hain`}
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={handleSubmit}
+            disabled={!allDone || loading}
+            className={`sub-btn ${allDone&&!loading ? 'on' : 'off'}`}
+          >
+            {loading
+              ? 'Submit ho raha hai...'
+              : existingSubmission
+              ? 'Update Physical Count'
+              : 'Submit Physical Count'}
+          </button>
+        )}
       </div>
     </>
   );
